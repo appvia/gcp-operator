@@ -1,0 +1,7 @@
+apiVersion: gcp.compute.hub.appvia.io/v1alpha1
+kind: GCPProject
+metadata:
+  name: example-gcpproject
+spec:
+  # Add fields here
+  size: 3
