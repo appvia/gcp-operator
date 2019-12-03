@@ -10,9 +10,22 @@ import (
 // GCPProjectSpec defines the desired state of GCPProject
 // +k8s:openapi-gen=true
 type GCPProjectSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
+	// ProjectId is the GCP project ID
+	// +kubebuilder:validation:Minimum=3
+	// +kubebuilder:validation:Required
+	ProjectId	string	`json:"projectId"`
+	// ProjectName is the GCP project name
+	// +kubebuilder:validation:Minimum=3
+	// +kubebuilder:validation:Required
+	ProjectName string	`json:"projectName"`
+	// ParentType is the type of parent this project has
+	// Valid types are: "organization", "folder", and "project"
+	// +kubebuilder:validation:Enum=organization;folder;project
+	// +kubebuilder:validation:Required
+	ParentType	string	`json:"parentType"`
+	// ParentId is the type specific ID of the parent this project has
+	// +kubebuilder:validation:Required
+	ParentId	string	`json:"parentId"`
 }
 
 // GCPProjectStatus defines the observed state of GCPProject

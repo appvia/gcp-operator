@@ -4,15 +4,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // GCPCredentialsSpec defines the desired state of GCPCredentials
 // +k8s:openapi-gen=true
 type GCPCredentialsSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
+	// Key is the credential used to create GCP projects
+	// You must create a service account with resourcemanager.projectCreator
+	// and billing.user roles at the organization level and use the JSON payload here
+	// +kubebuilder:validation:Minimum=3
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+	// ProjectId is the GCP project ID these credentials belong to
+	// +kubebuilder:validation:Minimum=3
+	// +kubebuilder:validation:Required
+	ProjectId string `json:"projectId"`
+	// Organization is the GCP org you wish the projects to reside within
+	// +kubebuilder:validation:Minimum=3
+	// +kubebuilder:validation:Required
+	OrganizationId string `json:"organizationId"`
+	// BillingAccountId is the GCP billing account ID you wish the projects to be linked to
+	// +kubebuilder:validation:Minimum=3
+	// +kubebuilder:validation:Required
+	BillingAccountId string `json:"billingAccountId"`
 }
 
 // GCPCredentialsStatus defines the observed state of GCPCredentials
