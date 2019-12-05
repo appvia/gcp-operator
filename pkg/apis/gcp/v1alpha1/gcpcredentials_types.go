@@ -30,9 +30,10 @@ type GCPCredentialsSpec struct {
 // GCPCredentialsStatus defines the observed state of GCPCredentials
 // +k8s:openapi-gen=true
 type GCPCredentialsStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
+	// Verified checks that the credentials are ok and valid
+	Verified bool `json:"verified"`
+	// Status provides a overall status
+	Status string `json:"status"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
