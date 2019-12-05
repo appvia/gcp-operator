@@ -4,36 +4,37 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // GCPProjectSpec defines the desired state of GCPProject
 // +k8s:openapi-gen=true
 type GCPProjectSpec struct {
 	// ProjectId is the GCP project ID
 	// +kubebuilder:validation:Minimum=3
 	// +kubebuilder:validation:Required
-	ProjectId	string	`json:"projectId"`
+	ProjectId string `json:"projectId"`
 	// ProjectName is the GCP project name
 	// +kubebuilder:validation:Minimum=3
 	// +kubebuilder:validation:Required
-	ProjectName string	`json:"projectName"`
+	ProjectName string `json:"projectName"`
 	// ParentType is the type of parent this project has
 	// Valid types are: "organization", "folder", and "project"
 	// +kubebuilder:validation:Enum=organization;folder;project
 	// +kubebuilder:validation:Required
-	ParentType	string	`json:"parentType"`
+	ParentType string `json:"parentType"`
 	// ParentId is the type specific ID of the parent this project has
 	// +kubebuilder:validation:Required
-	ParentId	string	`json:"parentId"`
+	ParentId string `json:"parentId"`
 }
 
 // GCPProjectStatus defines the observed state of GCPProject
 // +k8s:openapi-gen=true
 type GCPProjectStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
+	// Status is the status of the GCP project
+	Status string `json:"status"`
+	// Conditions is a series of things that caused the failure if any
+	// +listType
+	Conditions []string `json:"conditions"`
+	// Phase is used to hold the current phase of the resource
+	Phase string `json:"phase"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
