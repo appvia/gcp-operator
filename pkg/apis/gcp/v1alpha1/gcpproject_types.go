@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	core "github.com/appvia/hub-apis/pkg/apis/core/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,13 +30,8 @@ type GCPProjectSpec struct {
 // GCPProjectStatus defines the observed state of GCPProject
 // +k8s:openapi-gen=true
 type GCPProjectStatus struct {
-	// Status is the status of the GCP project
-	Status string `json:"status"`
-	// Conditions is a series of things that caused the failure if any
-	// +listType
-	Conditions []string `json:"conditions"`
-	// Phase is used to hold the current phase of the resource
-	Phase string `json:"phase"`
+	// Status provides a overall status
+	Status core.Status `json:"status"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

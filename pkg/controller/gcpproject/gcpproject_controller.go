@@ -4,7 +4,6 @@ import (
 	"context"
 
 	gcpv1alpha1 "github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -14,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	core "github.com/appvia/hub-apis/pkg/apis/core/v1"
 )
 
 var logger = logf.Log.WithName("controller_gcpproject")
@@ -42,17 +42,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
-
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
-	// Watch for changes to secondary resource Pods and requeue the owner GCPProject
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &gcpv1alpha1.GCPProject{},
-	})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -77,8 +66,9 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 	reqLogger.Info("Reconciling GCPProject")
 
 	// Fetch the GCPProject instance
-	instance := &gcpv1alpha1.GCPProject{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	projectInstance := &gcpv1alpha1.GCPProject{}
+
+	err := r.client.Get(context.TODO(), request.NamespacedName, projectInstance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -90,8 +80,8 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	// Get project details
-	projectId, projectName, parentType, parentId := instance.Spec.ProjectId, instance.Spec.ProjectName, instance.Spec.ParentType, instance.Spec.ParentId
+	// Get project details from spec
+	projectId, projectName, parentType, parentId := projectInstance.Spec.ProjectId, projectInstance.Spec.ProjectName, projectInstance.Spec.ParentType, projectInstance.Spec.ParentId
 
 	ctx := context.Background()
 
@@ -108,6 +98,29 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	if projectExists {
+		project, err := GetProject(ctx, c, projectId)
+
+		if projectName == project.ProjectName && parentType == project.Parent.Type && parentId == project.Parent.Id {
+			// Exists and state as desired
+			return reconcile.Result{}, nil
+		}
+
+		// Exists but state differs
+		updateOperationName, err := UpdateProject(ctx, c, projectId, projectName, parentId, parentType)
+
+		// Set status to pending
+		p.project.Status.Status = core.PendingStatus
+
+		// Wait for operation to complete
+		_, err = WaitForOperation(ctx, c, operationName)
+
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+
+		// Set status to success
+		p.project.Status.Status = core.SuccessStatus
+
 		return reconcile.Result{}, nil
 	}
 
@@ -118,12 +131,18 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	// Set status to pending
+	p.project.Status.Status = core.PendingStatus
+
 	// Wait for operation to complete
 	_, err = WaitForOperation(ctx, c, operationName)
 
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+
+	// Set status to success
+	p.project.Status.Status = core.SuccessStatus
 
 	return reconcile.Result{}, nil
 }

@@ -96,6 +96,32 @@ func CreateProject(ctx context.Context, c *http.Client, projectId, projectName, 
 	return resp.Name, nil
 }
 
+func UpdateProject(ctx context.Context, c *http.Client, projectId, projectName, parentId, parentType string) (operationName string, err error) {
+	cloudresourcemanagerService, err := cloudresourcemanager.New(c)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	parent := &cloudresourcemanager.ResourceId{
+		Id:   parentId,
+		Type: parentType,
+	}
+
+	rb := &cloudresourcemanager.Project{
+		Name:      projectName,
+		ProjectId: projectId,
+		Parent:    parent,
+	}
+
+	resp, err := cloudresourcemanagerService.Projects.Update(projectId, rb).Context(ctx).Do()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	return resp.Name, nil
+}
+
 func WaitForOperation(ctx context.Context, c *http.Client, operationName string) (complete bool, err error) {
 	cloudresourcemanagerService, err := cloudresourcemanager.New(c)
 
