@@ -2,16 +2,15 @@ package gcpproject
 
 import (
 	"context"
+	"log"
 
 	gcpv1alpha1 "github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
+	core "github.com/appvia/hub-apis/pkg/apis/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -19,12 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("controller_gcpproject")
-
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
+var logger = logf.Log.WithName("controller_gcpproject")
 
 // Add creates a new GCPProject Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -50,17 +44,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
-
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
-	// Watch for changes to secondary resource Pods and requeue the owner GCPProject
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &gcpv1alpha1.GCPProject{},
-	})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -77,18 +60,41 @@ type ReconcileGCPProject struct {
 
 // Reconcile reads that state of the cluster for a GCPProject object and makes changes based on the state read
 // and what is in the GCPProject.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  This example creates
-// a Pod as an example
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	reqLogger := logger.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling GCPProject")
 
 	// Fetch the GCPProject instance
-	instance := &gcpv1alpha1.GCPProject{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	projectInstance := &gcpv1alpha1.GCPProject{}
+
+	credentials := &gcpv1alpha1.GCPCredentials{}
+
+	reference := types.NamespacedName{
+		Namespace: projectInstance.Spec.Use.Namespace,
+		Name:      projectInstance.Spec.Use.Name,
+	}
+
+	ctx := context.Background()
+
+	err := r.client.Get(ctx, reference, credentials)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Authenticate to cloudresourcemanager
+	crm, err := GoogleClient(ctx, credentials.Spec.Key)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Attempt to retrieve the project
+	err = r.client.Get(context.TODO(), request.NamespacedName, projectInstance)
+
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -100,54 +106,86 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	// Define a new Pod object
-	pod := newPodForCR(instance)
+	// Get project details from spec
+	projectId, projectName, parentType, parentId := projectInstance.Spec.ProjectId, projectInstance.Spec.ProjectName, projectInstance.Spec.ParentType, projectInstance.Spec.ParentId
 
-	// Set GCPProject instance as the owner and controller
-	if err := controllerutil.SetControllerReference(instance, pod, r.scheme); err != nil {
+	// Check if project already exists
+	projectExists, err := ProjectExists(ctx, crm, projectId)
+
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	// Check if this Pod already exists
-	found := &corev1.Pod{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a new Pod", "Pod.Namespace", pod.Namespace, "Pod.Name", pod.Name)
-		err = r.client.Create(context.TODO(), pod)
+	if projectExists {
+		project, err := GetProject(ctx, crm, projectId)
+
+		if projectName == project.Name && parentType == project.Parent.Type && parentId == project.Parent.Id {
+			// Exists and state as desired
+			return reconcile.Result{}, nil
+		}
+
+		// Exists but state differs
+		updateOperationName, err := UpdateProject(ctx, crm, projectId, projectName, parentId, parentType)
+
+		// Set status to pending
+		projectInstance.Status.Status = core.PendingStatus
+
+		if err := r.client.Status().Update(ctx, projectInstance); err != nil {
+			logger.Error(err, "failed to update the resource status")
+
+			return reconcile.Result{}, err
+		}
+
+		// Wait for operation to complete
+		_, err = WaitForOperation(ctx, crm, updateOperationName)
+
 		if err != nil {
 			return reconcile.Result{}, err
 		}
 
-		// Pod created successfully - don't requeue
+		// Set status to success
+		projectInstance.Status.Status = core.SuccessStatus
+
+		if err := r.client.Status().Update(ctx, projectInstance); err != nil {
+			logger.Error(err, "failed to update the resource status")
+
+			return reconcile.Result{}, err
+		}
+
 		return reconcile.Result{}, nil
-	} else if err != nil {
+	}
+
+	// Create project
+	operationName, err := CreateProject(ctx, crm, projectId, projectName, parentId, parentType)
+
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	// Pod already exists - don't requeue
-	reqLogger.Info("Skip reconcile: Pod already exists", "Pod.Namespace", found.Namespace, "Pod.Name", found.Name)
-	return reconcile.Result{}, nil
-}
+	// Set status to pending
+	projectInstance.Status.Status = core.PendingStatus
 
-// newPodForCR returns a busybox pod with the same name/namespace as the cr
-func newPodForCR(cr *gcpv1alpha1.GCPProject) *corev1.Pod {
-	labels := map[string]string{
-		"app": cr.Name,
+	if err := r.client.Status().Update(ctx, projectInstance); err != nil {
+		logger.Error(err, "failed to update the resource status")
+
+		return reconcile.Result{}, err
 	}
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name + "-pod",
-			Namespace: cr.Namespace,
-			Labels:    labels,
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:    "busybox",
-					Image:   "busybox",
-					Command: []string{"sleep", "3600"},
-				},
-			},
-		},
+
+	// Wait for operation to complete
+	_, err = WaitForOperation(ctx, crm, operationName)
+
+	if err != nil {
+		return reconcile.Result{}, err
 	}
+
+	// Set status to success
+	projectInstance.Status.Status = core.SuccessStatus
+
+	if err := r.client.Status().Update(ctx, projectInstance); err != nil {
+		logger.Error(err, "failed to update the resource status")
+
+		return reconcile.Result{}, err
+	}
+
+	return reconcile.Result{}, nil
 }
