@@ -25,6 +25,10 @@ type GCPProjectSpec struct {
 	// ParentId is the type specific ID of the parent this project has
 	// +kubebuilder:validation:Required
 	ParentId string `json:"parentId"`
+	// GCPCredentials is a reference to the gcp credentials object to use
+	// +kubebuilder:validation:Required
+	// +k8s:openapi-gen=false
+	Use core.Ownership `json:"use"`
 }
 
 // GCPProjectStatus defines the observed state of GCPProject

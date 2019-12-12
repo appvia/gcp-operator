@@ -2,10 +2,13 @@ package gcpproject
 
 import (
 	"context"
+	"log"
 
 	gcpv1alpha1 "github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
+	core "github.com/appvia/hub-apis/pkg/apis/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -13,7 +16,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	core "github.com/appvia/hub-apis/pkg/apis/core/v1"
 )
 
 var logger = logf.Log.WithName("controller_gcpproject")
@@ -68,7 +70,31 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 	// Fetch the GCPProject instance
 	projectInstance := &gcpv1alpha1.GCPProject{}
 
-	err := r.client.Get(context.TODO(), request.NamespacedName, projectInstance)
+	credentials := &gcpv1alpha1.GCPCredentials{}
+
+	reference := types.NamespacedName{
+		Namespace: projectInstance.Spec.Use.Namespace,
+		Name:      projectInstance.Spec.Use.Name,
+	}
+
+	ctx := context.Background()
+
+	err := r.client.Get(ctx, reference, credentials)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Authenticate to cloudresourcemanager
+	crm, err := GoogleClient(ctx, credentials.Spec.Key)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Attempt to retrieve the project
+	err = r.client.Get(context.TODO(), request.NamespacedName, projectInstance)
+
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -83,66 +109,83 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 	// Get project details from spec
 	projectId, projectName, parentType, parentId := projectInstance.Spec.ProjectId, projectInstance.Spec.ProjectName, projectInstance.Spec.ParentType, projectInstance.Spec.ParentId
 
-	ctx := context.Background()
-
-	// TODO: get key string from GCPCredentials and use JWTConfigFromJSON
-	// https://github.com/golang/oauth2/blob/master/google/google.go#L80
-
-	c, err := GoogleClient(ctx)
-
 	// Check if project already exists
-	projectExists, err := ProjectExists(ctx, c, projectId)
+	projectExists, err := ProjectExists(ctx, crm, projectId)
 
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	if projectExists {
-		project, err := GetProject(ctx, c, projectId)
+		project, err := GetProject(ctx, crm, projectId)
 
-		if projectName == project.ProjectName && parentType == project.Parent.Type && parentId == project.Parent.Id {
+		if projectName == project.Name && parentType == project.Parent.Type && parentId == project.Parent.Id {
 			// Exists and state as desired
 			return reconcile.Result{}, nil
 		}
 
 		// Exists but state differs
-		updateOperationName, err := UpdateProject(ctx, c, projectId, projectName, parentId, parentType)
+		updateOperationName, err := UpdateProject(ctx, crm, projectId, projectName, parentId, parentType)
 
 		// Set status to pending
-		p.project.Status.Status = core.PendingStatus
+		projectInstance.Status.Status = core.PendingStatus
+
+		if err := r.client.Status().Update(ctx, projectInstance); err != nil {
+			logger.Error(err, "failed to update the resource status")
+
+			return reconcile.Result{}, err
+		}
 
 		// Wait for operation to complete
-		_, err = WaitForOperation(ctx, c, operationName)
+		_, err = WaitForOperation(ctx, crm, updateOperationName)
 
 		if err != nil {
 			return reconcile.Result{}, err
 		}
 
 		// Set status to success
-		p.project.Status.Status = core.SuccessStatus
+		projectInstance.Status.Status = core.SuccessStatus
+
+		if err := r.client.Status().Update(ctx, projectInstance); err != nil {
+			logger.Error(err, "failed to update the resource status")
+
+			return reconcile.Result{}, err
+		}
 
 		return reconcile.Result{}, nil
 	}
 
 	// Create project
-	operationName, err := CreateProject(ctx, c, projectId, projectName, parentId, parentType)
+	operationName, err := CreateProject(ctx, crm, projectId, projectName, parentId, parentType)
 
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// Set status to pending
-	p.project.Status.Status = core.PendingStatus
+	projectInstance.Status.Status = core.PendingStatus
+
+	if err := r.client.Status().Update(ctx, projectInstance); err != nil {
+		logger.Error(err, "failed to update the resource status")
+
+		return reconcile.Result{}, err
+	}
 
 	// Wait for operation to complete
-	_, err = WaitForOperation(ctx, c, operationName)
+	_, err = WaitForOperation(ctx, crm, operationName)
 
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// Set status to success
-	p.project.Status.Status = core.SuccessStatus
+	projectInstance.Status.Status = core.SuccessStatus
+
+	if err := r.client.Status().Update(ctx, projectInstance); err != nil {
+		logger.Error(err, "failed to update the resource status")
+
+		return reconcile.Result{}, err
+	}
 
 	return reconcile.Result{}, nil
 }

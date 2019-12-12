@@ -2,26 +2,30 @@ package gcpproject
 
 import (
 	"log"
-	"net/http"
 
+	"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
 	"golang.org/x/net/context"
-	"golang.org/x/oauth2/google"
 	"google.golang.org/api/cloudresourcemanager/v1"
+	"google.golang.org/api/option"
 )
 
-func GoogleClient(ctx context.Context) (*http.Client, error) {
-	// TODO: take cred string bytes as arg
-	client, err := google.DefaultClient(ctx, cloudresourcemanager.CloudPlatformScope)
+// VerifyCredentials is responsible for verifying GCP creds
+func VerifyCredentials(credentials *v1alpha1.GCPCredentials) error {
+	return nil
+}
+
+func GoogleClient(ctx context.Context, key string) (c *cloudresourcemanager.Service, err error) {
+	options := []option.ClientOption{option.WithCredentialsJSON([]byte(key))}
+
+	c, err = cloudresourcemanager.NewService(ctx, options...)
 
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	return client, nil
+	return c, nil
 }
 
-func ProjectExists(ctx context.Context, c *http.Client, projectId string) (bool, error) {
-	cloudresourcemanagerService, err := cloudresourcemanager.New(c)
+func ProjectExists(ctx context.Context, crm *cloudresourcemanager.Service, projectId string) (exists bool, err error) {
 
 	if err != nil {
 		log.Fatal(err)
@@ -29,7 +33,7 @@ func ProjectExists(ctx context.Context, c *http.Client, projectId string) (bool,
 
 	log.Println("Listing projects matching filter id:" + projectId)
 
-	resp, err := cloudresourcemanagerService.Projects.List().Filter("id:" + projectId).Do()
+	resp, err := crm.Projects.List().Filter("id:" + projectId).Do()
 
 	if err != nil {
 		return false, err
@@ -47,28 +51,25 @@ func ProjectExists(ctx context.Context, c *http.Client, projectId string) (bool,
 	return true, nil
 }
 
-func GetProject(ctx context.Context, c *http.Client, projectId string) (project *cloudresourcemanager.Project, err error) {
-	cloudresourcemanagerService, err := cloudresourcemanager.New(c)
+func GetProject(ctx context.Context, crm *cloudresourcemanager.Service, projectId string) (project *cloudresourcemanager.Project, err error) {
 
-	project, err = cloudresourcemanagerService.Projects.Get(projectId).Context(ctx).Do()
+	project, err = crm.Projects.Get(projectId).Context(ctx).Do()
 
 	return project, nil
 }
 
-func DeleteProject(ctx context.Context, c *http.Client, projectId string) error {
-	cloudresourcemanagerService, err := cloudresourcemanager.New(c)
+func DeleteProject(ctx context.Context, crm *cloudresourcemanager.Service, projectId string) (err error) {
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	_, err = cloudresourcemanagerService.Projects.Delete(projectId).Context(ctx).Do()
+	_, err = crm.Projects.Delete(projectId).Context(ctx).Do()
 
 	return err
 }
 
-func CreateProject(ctx context.Context, c *http.Client, projectId, projectName, parentId, parentType string) (operationName string, err error) {
-	cloudresourcemanagerService, err := cloudresourcemanager.New(c)
+func CreateProject(ctx context.Context, crm *cloudresourcemanager.Service, projectId, projectName, parentId, parentType string) (operationName string, err error) {
 
 	if err != nil {
 		log.Fatal(err)
@@ -87,7 +88,7 @@ func CreateProject(ctx context.Context, c *http.Client, projectId, projectName, 
 
 	log.Println("Creating project")
 
-	resp, err := cloudresourcemanagerService.Projects.Create(rb).Context(ctx).Do()
+	resp, err := crm.Projects.Create(rb).Context(ctx).Do()
 
 	if err != nil {
 		log.Fatal(err)
@@ -96,8 +97,7 @@ func CreateProject(ctx context.Context, c *http.Client, projectId, projectName, 
 	return resp.Name, nil
 }
 
-func UpdateProject(ctx context.Context, c *http.Client, projectId, projectName, parentId, parentType string) (operationName string, err error) {
-	cloudresourcemanagerService, err := cloudresourcemanager.New(c)
+func UpdateProject(ctx context.Context, crm *cloudresourcemanager.Service, projectId, projectName, parentId, parentType string) (operationName string, err error) {
 
 	if err != nil {
 		log.Fatal(err)
@@ -114,7 +114,7 @@ func UpdateProject(ctx context.Context, c *http.Client, projectId, projectName, 
 		Parent:    parent,
 	}
 
-	resp, err := cloudresourcemanagerService.Projects.Update(projectId, rb).Context(ctx).Do()
+	resp, err := crm.Projects.Update(projectId, rb).Context(ctx).Do()
 
 	if err != nil {
 		log.Fatal(err)
@@ -122,8 +122,7 @@ func UpdateProject(ctx context.Context, c *http.Client, projectId, projectName, 
 	return resp.Name, nil
 }
 
-func WaitForOperation(ctx context.Context, c *http.Client, operationName string) (complete bool, err error) {
-	cloudresourcemanagerService, err := cloudresourcemanager.New(c)
+func WaitForOperation(ctx context.Context, crm *cloudresourcemanager.Service, operationName string) (complete bool, err error) {
 
 	log.Println("Waiting for operation", operationName)
 
@@ -132,7 +131,7 @@ func WaitForOperation(ctx context.Context, c *http.Client, operationName string)
 	}
 
 	for {
-		resp, err := cloudresourcemanagerService.Operations.Get(operationName).Context(ctx).Do()
+		resp, err := crm.Operations.Get(operationName).Context(ctx).Do()
 		if err != nil {
 			log.Fatal(err)
 		}
