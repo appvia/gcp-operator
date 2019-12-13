@@ -163,7 +163,7 @@ func CallGoogleRest(bearer, url, method string, reqBody []byte) (responseBody []
 	defer resp.Body.Close()
 	fmt.Println("response Status:", resp.Status)
 	fmt.Println("response Headers:", resp.Header)
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	fmt.Println("response Body:", string(body))
 	return body, err
 }
