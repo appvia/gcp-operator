@@ -188,7 +188,7 @@ func HttpCreateProject(bearer, projectId, projectName, orgId string) (operationN
 
 	operationName = operation.Name
 
-	return operationName, nil
+	return operationName, err
 }
 
 func HttpCreateServiceAccount(bearer, projectId, serviceAccountName, displayName string) (err error) {
