@@ -1,0 +1,7 @@
+apiVersion: gcp.project.hub.appvia.io/v1alpha1
+kind: GCPAdminToken
+metadata:
+  name: example-gcpadmintoken
+spec:
+  # Add fields here
+  size: 3

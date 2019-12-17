@@ -75,10 +75,10 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 	reqLogger := logger.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling GCPProject")
 
-	// Fetch the GCPProject instance
-	projectInstance := &gcpv1alpha1.GCPProject{}
+	// Fetch the GCPAdminProject instance
+	projectInstance := &gcpv1alpha1.GCPAdminProject{}
 
-	credentials := &gcpv1alpha1.GCPCredentials{}
+	adminToken := &gcpv1alpha1.GCPAdminToken{}
 
 	reference := types.NamespacedName{
 		Namespace: projectInstance.Spec.Use.Namespace,
