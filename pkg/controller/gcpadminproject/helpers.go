@@ -2,6 +2,7 @@ package gcpadminproject
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -37,11 +38,11 @@ func CallGoogleRest(bearer, url, method string, reqBody []byte) (responseBody []
 	return body, err
 }
 
-func HttpCreateProject(bearer, projectId, projectName, orgId string) (operationName string, err error) {
+func HttpCreateProject(bearer, projectId, projectName, parentId, parentType string) (operationName string, err error) {
 	url := "https://cloudresourcemanager.googleapis.com/v1/projects/"
 	parent := &cloudresourcemanager.ResourceId{
-		Id:   orgId,
-		Type: "organization",
+		Id:   parentId,
+		Type: parentType,
 	}
 	project := &cloudresourcemanager.Project{
 		Name:      projectName,
@@ -58,6 +59,82 @@ func HttpCreateProject(bearer, projectId, projectName, orgId string) (operationN
 	operationName = operation.Name
 
 	return operationName, err
+}
+
+func HttpUpdateProject(ctx context.Context, bearer, projectId, projectName, parentId, parentType string) (operationName string, err error) {
+	url := "https://cloudresourcemanager.googleapis.com/v1/projects/"
+	parent := &cloudresourcemanager.ResourceId{
+		Id:   parentId,
+		Type: parentType,
+	}
+	project := &cloudresourcemanager.Project{
+		Name:      projectName,
+		ProjectId: projectId,
+		Parent:    parent,
+	}
+	reqBody, err := json.Marshal(project)
+	resBody, err := CallGoogleRest(bearer, url, "PUT", reqBody)
+
+	var operation cloudresourcemanager.Operation
+
+	json.Unmarshal(resBody, &operation)
+
+	operationName = operation.Name
+
+	return operationName, err
+}
+
+func HttpProjectExists(ctx context.Context, bearer, projectId string) (exists bool, err error) {
+	url := "https://cloudresourcemanager.googleapis.com/v1/projects?filter=id:" + projectId
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Listing projects matching filter id:" + projectId)
+
+	var projects []cloudresourcemanager.Project
+
+	resp, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0))
+
+	json.Unmarshal(resp, &projects)
+
+	projectsReturned := len(projects)
+
+	if projectsReturned == 0 {
+		log.Println("Project not found")
+		return false, nil
+	}
+
+	log.Println("Project found")
+
+	return true, nil
+}
+
+func HttpGetProject(ctx context.Context, bearer, projectId string) (exists bool, project *cloudresourcemanager.Project, err error) {
+	url := "https://cloudresourcemanager.googleapis.com/v1/projects/" + projectId
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Attempting to retrieve project", projectId)
+
+	resp, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	json.Unmarshal(resp, &project)
+
+	if err != nil {
+		exists = true
+	} else {
+		exists = false
+	}
+
+	return exists, project, err
 }
 
 func HttpCreateServiceAccount(bearer, projectId, serviceAccountName, displayName string) (err error) {
@@ -137,7 +214,21 @@ func HttpWaitForOperation(operationName, bearer string) (complete bool, err erro
 	return true, err
 }
 
-func HttpUpdateBilling(projectId, billingAccountName, bearer string) (complete bool, err error) {
+func HttpGetBilling(projectId, bearer string) (billingAccountName string, err error) {
+	url := "https://cloudbilling.googleapis.com/v1/projects/" + projectId + "/billingInfo"
+
+	var billingInfo cloudbilling.ProjectBillingInfo
+
+	log.Println("Retrieving billing account for", projectId)
+
+	resp, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0))
+
+	err = json.Unmarshal(resp, &billingInfo)
+
+	return billingInfo.BillingAccountName, err
+}
+
+func HttpUpdateBilling(projectId, billingAccountName, bearer string) (err error) {
 	url := "https://cloudbilling.googleapis.com/v1/projects/" + projectId + "/billingInfo"
 
 	billingInfo := &cloudbilling.ProjectBillingInfo{
@@ -145,7 +236,7 @@ func HttpUpdateBilling(projectId, billingAccountName, bearer string) (complete b
 		BillingEnabled:     true,
 	}
 	reqBody, err := json.Marshal(billingInfo)
-	log.Println("Updating billing account for", projectName, "to", billingAccountName)
+	log.Println("Updating billing account for", projectId, "to", billingAccountName)
 	_, err = CallGoogleRest(bearer, url, "PUT", reqBody)
 	return err
 }
