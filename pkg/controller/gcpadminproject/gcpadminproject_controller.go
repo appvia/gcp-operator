@@ -2,9 +2,10 @@ package gcpadminproject
 
 import (
 	"context"
+	"log"
 
 	gcpv1alpha1 "github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
+	core "github.com/appvia/hub-apis/pkg/apis/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -17,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("controller_gcpadminproject")
+var logger = logf.Log.WithName("controller_gcpadminproject")
 
 // Add creates a new GCPAdminProject Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -44,16 +45,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
-	// Watch for changes to secondary resource Pods and requeue the owner GCPAdminProject
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &gcpv1alpha1.GCPAdminProject{},
-	})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -73,35 +64,30 @@ type ReconcileGCPAdminProject struct {
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := logger.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	reqLogger.Info("Reconciling GCPProject")
+	reqLogger.Info("Reconciling GCPAdminProject")
 
 	// Fetch the GCPAdminProject instance
-	projectInstance := &gcpv1alpha1.GCPAdminProject{}
+	adminProjectInstance := &gcpv1alpha1.GCPAdminProject{}
 
 	adminToken := &gcpv1alpha1.GCPAdminToken{}
 
+	bearer := adminToken.Spec.Token
+
 	reference := types.NamespacedName{
-		Namespace: projectInstance.Spec.Use.Namespace,
-		Name:      projectInstance.Spec.Use.Name,
+		Namespace: adminProjectInstance.Spec.Use.Namespace,
+		Name:      adminProjectInstance.Spec.Use.Name,
 	}
 
 	ctx := context.Background()
 
-	err := r.client.Get(ctx, reference, credentials)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Authenticate to cloudresourcemanager
-	crm, err := GoogleClient(ctx, credentials.Spec.Key)
+	err := r.client.Get(ctx, reference, adminToken)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Attempt to retrieve the project
-	err = r.client.Get(context.TODO(), request.NamespacedName, projectInstance)
+	err = r.client.Get(context.TODO(), request.NamespacedName, adminProjectInstance)
 
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -115,46 +101,59 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 	}
 
 	// Get project details from spec
-	projectId, projectName, parentType, parentId := projectInstance.Spec.ProjectId, projectInstance.Spec.ProjectName, projectInstance.Spec.ParentType, projectInstance.Spec.ParentId
+	projectId, projectName, parentType, parentId := adminProjectInstance.Spec.ProjectId, adminProjectInstance.Spec.ProjectName, adminProjectInstance.Spec.ParentType, adminProjectInstance.Spec.ParentId
 
 	// Check if project already exists
-	projectExists, err := ProjectExists(ctx, crm, projectId)
+	projectExists, err := HttpProjectExists(ctx, bearer, projectId)
 
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	if projectExists {
-		project, err := GetProject(ctx, crm, projectId)
+		_, project, err := HttpGetProject(ctx, bearer, projectId)
 
-		if projectName == project.Name && parentType == project.Parent.Type && parentId == project.Parent.Id {
-			// Exists and state as desired
-			return reconcile.Result{}, nil
+		billingAccountName, err := HttpGetBilling(projectId, bearer)
+
+		if projectName != project.Name || parentType != project.Parent.Type || parentId != project.Parent.Id {
+			// Project exists but state differs
+			updateOperationName, err := HttpUpdateProject(ctx, bearer, projectId, projectName, parentId, parentType)
+
+			// Set status to pending
+			adminProjectInstance.Status.Status = core.PendingStatus
+
+			if err := r.client.Status().Update(ctx, adminProjectInstance); err != nil {
+				logger.Error(err, "failed to update the resource status")
+				return reconcile.Result{}, err
+			}
+
+			// Wait for project update operation to complete
+			_, err = HttpWaitForOperation(updateOperationName, bearer)
+
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 
-		// Exists but state differs
-		updateOperationName, err := UpdateProject(ctx, crm, projectId, projectName, parentId, parentType)
+		if billingAccountName != adminProjectInstance.Spec.BillingAccountName {
+			// Project exists but billing differs
+			err = HttpUpdateBilling(projectId, billingAccountName, bearer)
+			if err != nil {
+				log.Fatal(err)
+			}
+			// Set status to pending
+			adminProjectInstance.Status.Status = core.PendingStatus
 
-		// Set status to pending
-		projectInstance.Status.Status = core.PendingStatus
-
-		if err := r.client.Status().Update(ctx, projectInstance); err != nil {
-			logger.Error(err, "failed to update the resource status")
-
-			return reconcile.Result{}, err
-		}
-
-		// Wait for operation to complete
-		_, err = HttWaitForOperation(ctx, crm, updateOperationName)
-
-		if err != nil {
-			return reconcile.Result{}, err
+			if err := r.client.Status().Update(ctx, adminProjectInstance); err != nil {
+				logger.Error(err, "failed to update the resource status")
+				return reconcile.Result{}, err
+			}
 		}
 
 		// Set status to success
-		projectInstance.Status.Status = core.SuccessStatus
+		adminProjectInstance.Status.Status = core.SuccessStatus
 
-		if err := r.client.Status().Update(ctx, projectInstance); err != nil {
+		if err := r.client.Status().Update(ctx, adminProjectInstance); err != nil {
 			logger.Error(err, "failed to update the resource status")
 
 			return reconcile.Result{}, err
@@ -164,32 +163,44 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 	}
 
 	// Create project
-	operationName, err := CreateProject(ctx, crm, projectId, projectName, parentId, parentType)
+	operationName, err := HttpCreateProject(bearer, projectId, projectName, parentId, parentType)
 
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// Set status to pending
-	projectInstance.Status.Status = core.PendingStatus
+	adminProjectInstance.Status.Status = core.PendingStatus
 
-	if err := r.client.Status().Update(ctx, projectInstance); err != nil {
+	if err := r.client.Status().Update(ctx, adminProjectInstance); err != nil {
 		logger.Error(err, "failed to update the resource status")
 
 		return reconcile.Result{}, err
 	}
 
 	// Wait for operation to complete
-	_, err = WaitForOperation(ctx, crm, operationName)
+	_, err = HttpWaitForOperation(operationName, bearer)
 
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	// Set status to success
-	projectInstance.Status.Status = core.SuccessStatus
+	// Set billing account for admin project
+	err = HttpUpdateBilling(projectId, adminProjectInstance.Spec.BillingAccountName, bearer)
 
-	if err := r.client.Status().Update(ctx, projectInstance); err != nil {
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := r.client.Status().Update(ctx, adminProjectInstance); err != nil {
+		logger.Error(err, "failed to update the resource status")
+		return reconcile.Result{}, err
+	}
+
+	// Set status to success
+	adminProjectInstance.Status.Status = core.SuccessStatus
+
+	if err := r.client.Status().Update(ctx, adminProjectInstance); err != nil {
 		logger.Error(err, "failed to update the resource status")
 
 		return reconcile.Result{}, err
