@@ -6,9 +6,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // GCPAdminProjectSpec defines the desired state of GCPAdminProject
 // +k8s:openapi-gen=true
 type GCPAdminProjectSpec struct {
@@ -33,7 +30,7 @@ type GCPAdminProjectSpec struct {
 	// +kubebuilder:validation:Required
 	// +k8s:openapi-gen=false
 	BillingAccountName string `json:"billingAccountName"`
-	// GCPCredentials is a reference to the gcp credentials object to use
+	// GCPAdminToken is a reference to the gcp token object to use
 	// +kubebuilder:validation:Required
 	// +k8s:openapi-gen=false
 	Use core.Ownership `json:"use"`
