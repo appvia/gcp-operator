@@ -6,9 +6,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// GCPProjectSpec defines the desired state of GCPProject
+// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+// GCPAdminProjectSpec defines the desired state of GCPAdminProject
 // +k8s:openapi-gen=true
-type GCPProjectSpec struct {
+type GCPAdminProjectSpec struct {
 	// ProjectId is the GCP project ID
 	// +kubebuilder:validation:Minimum=3
 	// +kubebuilder:validation:Required
@@ -26,6 +29,7 @@ type GCPProjectSpec struct {
 	// +kubebuilder:validation:Required
 	ParentId string `json:"parentId"`
 	// BillingAccountName is the resource name of the billing account associated with the project
+	// e.g. `012345-567890-ABCDEF`
 	// +kubebuilder:validation:Required
 	// +k8s:openapi-gen=false
 	BillingAccountName string `json:"billingAccountName"`
@@ -35,36 +39,36 @@ type GCPProjectSpec struct {
 	Use core.Ownership `json:"use"`
 }
 
-// GCPProjectStatus defines the observed state of GCPProject
+// GCPAdminProjectStatus defines the observed state of GCPAdminProject
 // +k8s:openapi-gen=true
-type GCPProjectStatus struct {
+type GCPAdminProjectStatus struct {
 	// Status provides a overall status
 	Status core.Status `json:"status"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// GCPProject is the Schema for the gcpprojects API
+// GCPAdminProject is the Schema for the gcpadminprojects API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:path=gcpprojects,scope=Namespaced
-type GCPProject struct {
+// +kubebuilder:resource:path=gcpadminprojects,scope=Namespaced
+type GCPAdminProject struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   GCPProjectSpec   `json:"spec,omitempty"`
-	Status GCPProjectStatus `json:"status,omitempty"`
+	Spec   GCPAdminProjectSpec   `json:"spec,omitempty"`
+	Status GCPAdminProjectStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// GCPProjectList contains a list of GCPProject
-type GCPProjectList struct {
+// GCPAdminProjectList contains a list of GCPAdminProject
+type GCPAdminProjectList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []GCPProject `json:"items"`
+	Items           []GCPAdminProject `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&GCPProject{}, &GCPProjectList{})
+	SchemeBuilder.Register(&GCPAdminProject{}, &GCPAdminProjectList{})
 }

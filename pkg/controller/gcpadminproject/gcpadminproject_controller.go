@@ -1,11 +1,10 @@
-package gcpproject
+package gcpadminproject
 
 import (
 	"context"
-	"log"
 
 	gcpv1alpha1 "github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
-	core "github.com/appvia/hub-apis/pkg/apis/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -18,9 +17,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var logger = logf.Log.WithName("controller_gcpproject")
+var log = logf.Log.WithName("controller_gcpadminproject")
 
-// Add creates a new GCPProject Controller and adds it to the Manager. The Manager will set fields on the Controller
+// Add creates a new GCPAdminProject Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
@@ -28,42 +27,51 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileGCPProject{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileGCPAdminProject{client: mgr.GetClient(), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("gcpproject-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("gcpadminproject-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
 
-	// Watch for changes to primary resource GCPProject
-	err = c.Watch(&source.Kind{Type: &gcpv1alpha1.GCPProject{}}, &handler.EnqueueRequestForObject{})
+	// Watch for changes to primary resource GCPAdminProject
+	err = c.Watch(&source.Kind{Type: &gcpv1alpha1.GCPAdminProject{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
+
+	// TODO(user): Modify this to be the types you create that are owned by the primary resource
+	// Watch for changes to secondary resource Pods and requeue the owner GCPAdminProject
+	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &gcpv1alpha1.GCPAdminProject{},
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-// blank assignment to verify that ReconcileGCPProject implements reconcile.Reconciler
-var _ reconcile.Reconciler = &ReconcileGCPProject{}
+// blank assignment to verify that ReconcileGCPAdminProject implements reconcile.Reconciler
+var _ reconcile.Reconciler = &ReconcileGCPAdminProject{}
 
-// ReconcileGCPProject reconciles a GCPProject object
-type ReconcileGCPProject struct {
+// ReconcileGCPAdminProject reconciles a GCPAdminProject object
+type ReconcileGCPAdminProject struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
 	client client.Client
 	scheme *runtime.Scheme
 }
 
-// Reconcile reads that state of the cluster for a GCPProject object and makes changes based on the state read
-// and what is in the GCPProject.Spec
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := logger.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling GCPProject")
 
@@ -86,7 +94,7 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Authenticate to cloudresourcemanager
-	crm, err := GoogleCRMClient(ctx, credentials.Spec.Key)
+	crm, err := GoogleClient(ctx, credentials.Spec.Key)
 
 	if err != nil {
 		log.Fatal(err)
@@ -137,7 +145,7 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 
 		// Wait for operation to complete
-		_, err = WaitForOperation(ctx, crm, updateOperationName)
+		_, err = HttWaitForOperation(ctx, crm, updateOperationName)
 
 		if err != nil {
 			return reconcile.Result{}, err
@@ -180,16 +188,6 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Set status to success
 	projectInstance.Status.Status = core.SuccessStatus
-
-	// Authenticate to cloudbilling
-	cb, err := GoogleCloudBillingClient(ctx, credentials.Spec.Key)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Update billing account
-	err = UpdateProjectBilling(ctx, cb, projectInstance.Spec.BillingAccountName, projectId)
 
 	if err := r.client.Status().Update(ctx, projectInstance); err != nil {
 		logger.Error(err, "failed to update the resource status")
