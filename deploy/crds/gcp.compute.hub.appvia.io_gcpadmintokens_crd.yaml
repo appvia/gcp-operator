@@ -32,7 +32,8 @@ spec:
           description: gcpadmintokenspec defines the desired state of GCPAdminTokens
           properties:
             key:
-              description: Key is the credential used to create GCP projects
+              description: 'Key is the access token used to create the initial GCP admin project,
+                generated using `gcloud auth print-access-token you@example.com`'
               type: string
           required:
           - key
@@ -44,7 +45,7 @@ spec:
               description: Status provides a overall status
               type: string
             verified:
-              description: Verified checks that the credentials are ok and valid
+              description: Verified checks that the token is ok and valid
               type: bool
           required:
           - status
