@@ -88,7 +88,7 @@ func HttpProjectExists(ctx context.Context, bearer, projectId string) (exists bo
 	url := "https://cloudresourcemanager.googleapis.com/v1/projects?filter=id:" + projectId
 
 	if err != nil {
-		log.Fatal(err)
+		return exists, err
 	}
 
 	log.Println("Listing projects matching filter id:" + projectId)
@@ -115,7 +115,7 @@ func HttpGetProject(ctx context.Context, bearer, projectId string) (exists bool,
 	url := "https://cloudresourcemanager.googleapis.com/v1/projects/" + projectId
 
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 
 	log.Println("Attempting to retrieve project", projectId)
@@ -123,7 +123,7 @@ func HttpGetProject(ctx context.Context, bearer, projectId string) (exists bool,
 	resp, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0))
 
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 
 	json.Unmarshal(resp, &project)
@@ -200,8 +200,7 @@ func HttpWaitForOperation(operationName, bearer string) (complete bool, err erro
 		resBody, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0)) // TODO: do this better
 		if err != nil {
 			log.Println("Exiting due to remote err")
-			log.Fatal(err)
-			break
+			return false, err
 		}
 		var operation cloudresourcemanager.Operation
 		json.Unmarshal(resBody, &operation)

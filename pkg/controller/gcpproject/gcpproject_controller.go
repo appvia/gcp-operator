@@ -2,7 +2,6 @@ package gcpproject
 
 import (
 	"context"
-	"log"
 
 	gcpv1alpha1 "github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
 	core "github.com/appvia/hub-apis/pkg/apis/core/v1"
@@ -82,14 +81,14 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 	err := r.client.Get(ctx, reference, credentials)
 
 	if err != nil {
-		log.Fatal(err)
+		return reconcile.Result{}, err
 	}
 
 	// Authenticate to cloudresourcemanager
 	crm, err := GoogleCRMClient(ctx, credentials.Spec.Key)
 
 	if err != nil {
-		log.Fatal(err)
+		return reconcile.Result{}, err
 	}
 
 	// Attempt to retrieve the project
@@ -222,7 +221,7 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 	cb, err := GoogleCloudBillingClient(ctx, credentials.Spec.Key)
 
 	if err != nil {
-		log.Fatal(err)
+		return reconcile.Result{}, err
 	}
 
 	// Update billing account

@@ -2,7 +2,6 @@ package gcpadminproject
 
 import (
 	"context"
-	"log"
 
 	gcpv1alpha1 "github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
 	core "github.com/appvia/hub-apis/pkg/apis/core/v1"
@@ -83,7 +82,7 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 	err := r.client.Get(ctx, reference, adminToken)
 
 	if err != nil {
-		log.Fatal(err)
+		return reconcile.Result{}, err
 	}
 
 	// Attempt to retrieve the project
@@ -131,7 +130,7 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 			_, err = HttpWaitForOperation(updateOperationName, bearer)
 
 			if err != nil {
-				log.Fatal(err)
+				return reconcile.Result{}, err
 			}
 		}
 
@@ -139,7 +138,7 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 			// Project exists but billing differs
 			err = HttpUpdateBilling(projectId, billingAccountName, bearer)
 			if err != nil {
-				log.Fatal(err)
+				return reconcile.Result{}, err
 			}
 			// Set status to pending
 			adminProjectInstance.Status.Status = core.PendingStatus
@@ -189,7 +188,7 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 	err = HttpUpdateBilling(projectId, adminProjectInstance.Spec.BillingAccountName, bearer)
 
 	if err != nil {
-		log.Fatal(err)
+		return reconcile.Result{}, err
 	}
 
 	if err := r.client.Status().Update(ctx, adminProjectInstance); err != nil {
