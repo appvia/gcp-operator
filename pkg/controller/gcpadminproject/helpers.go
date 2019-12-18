@@ -247,11 +247,11 @@ func HttpEnableAPI(projectId, serviceName, bearer string) (operationName string,
 	log.Println("Enabling service", serviceName, "for project", projectId)
 	resp, err := CallGoogleRest(bearer, url, "POST", make([]byte, 0))
 
-	var operation cloudresourcemanager.Operation
+	if err != nil {
+		return operationName, err
+	}
 
-	json.Unmarshal(resp, &operation)
+	operation := &cloudresourcemanager.Operation{}
 
-	operationName = operation.Name
-
-	return operationName, err
+	return operation.Name, json.Unmarshal(resp, operation)
 }

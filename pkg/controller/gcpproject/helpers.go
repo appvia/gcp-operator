@@ -192,6 +192,5 @@ func EnableAPI(ctx context.Context, sm *servicemanagement.APIService, projectId,
 	if err != nil {
 		log.Fatal(err)
 	}
-	operationName = resp.Name
-	return operationName, err
+	return resp.Name, err
 }
