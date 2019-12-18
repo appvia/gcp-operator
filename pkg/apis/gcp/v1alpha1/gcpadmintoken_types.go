@@ -4,15 +4,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// GCPCredentialsSpec defines the desired state of GCPCredentials
+// GCPAdminTokenSpec defines the desired state of GCPAdminToken
 // +k8s:openapi-gen=true
-type GCPCredentialsSpec struct {
-	// Key is the credential used to create GCP projects
-	// You must create a service account with resourcemanager.projectCreator
-	// and billing.user roles at the organization level and use the JSON payload here
+type GCPAdminTokenSpec struct {
+	// Token is the bearer token used to setup the initial GCP admin project and service account
+	// You must grab a token using `gcloud auth print-access-token you@example.com`
 	// +kubebuilder:validation:Minimum=3
 	// +kubebuilder:validation:Required
-	Key string `json:"key"`
+	Token string `json:"token"`
 	// ProjectId is the GCP project ID these credentials belong to
 	// +kubebuilder:validation:Minimum=3
 	// +kubebuilder:validation:Required
@@ -23,10 +22,10 @@ type GCPCredentialsSpec struct {
 	OrganizationId string `json:"organizationId"`
 }
 
-// GCPCredentialsStatus defines the observed state of GCPCredentials
+// GCPAdminTokenStatus defines the observed state of GCPAdminToken
 // +k8s:openapi-gen=true
-type GCPCredentialsStatus struct {
-	// Verified checks that the credentials are ok and valid
+type GCPAdminTokenStatus struct {
+	// Verified checks that the token is ok and valid
 	Verified bool `json:"verified"`
 	// Status provides a overall status
 	Status string `json:"status"`
@@ -34,27 +33,27 @@ type GCPCredentialsStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// GCPCredentials is the Schema for the gcpcredentials API
+// GCPAdminToken is the Schema for the gcpadmintokens API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:path=gcpcredentials,scope=Namespaced
-type GCPCredentials struct {
+// +kubebuilder:resource:path=gcpadmintokens,scope=Namespaced
+type GCPAdminToken struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   GCPCredentialsSpec   `json:"spec,omitempty"`
-	Status GCPCredentialsStatus `json:"status,omitempty"`
+	Spec   GCPAdminTokenSpec   `json:"spec,omitempty"`
+	Status GCPAdminTokenStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// GCPCredentialsList contains a list of GCPCredentials
-type GCPCredentialsList struct {
+// GCPAdminTokenList contains a list of GCPAdminToken
+type GCPAdminTokenList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []GCPCredentials `json:"items"`
+	Items           []GCPAdminToken `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&GCPCredentials{}, &GCPCredentialsList{})
+	SchemeBuilder.Register(&GCPAdminToken{}, &GCPAdminTokenList{})
 }

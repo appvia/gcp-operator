@@ -2,7 +2,6 @@ package gcpproject
 
 import (
 	"context"
-	"log"
 
 	gcpv1alpha1 "github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
 	core "github.com/appvia/hub-apis/pkg/apis/core/v1"
@@ -82,14 +81,14 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 	err := r.client.Get(ctx, reference, credentials)
 
 	if err != nil {
-		log.Fatal(err)
+		return reconcile.Result{}, err
 	}
 
 	// Authenticate to cloudresourcemanager
-	crm, err := GoogleClient(ctx, credentials.Spec.Key)
+	crm, err := GoogleCRMClient(ctx, credentials.Spec.Key)
 
 	if err != nil {
-		log.Fatal(err)
+		return reconcile.Result{}, err
 	}
 
 	// Attempt to retrieve the project
@@ -178,8 +177,55 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	// Get a service management client for enabling required APIs
+	sm, err := GoogleServiceManagementClient(ctx, credentials.Spec.Key)
+
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	servicesToEnable := []string{
+		"cloudresourcemanager.googleapis.com",
+		"cloudbilling.googleapis.com",
+		"iam.googleapis.com",
+		"compute.googleapis.com",
+		"serviceusage.googleapis.com",
+	}
+
+	// Enable each API in the new project
+	for _, s := range servicesToEnable {
+		err := func() error {
+			name, err := EnableAPI(ctx, sm, projectId, s)
+			if err != nil {
+				return err
+			}
+			reqLogger.Info("Waiting for operation:", name)
+			if _, err = WaitForOperation(ctx, crm, name); err != nil {
+				return err
+			}
+			reqLogger.Info("Enabled service:", s)
+
+			return nil
+		}()
+		if err != nil {
+			logger.Error(err, "failed to enable the service:", err)
+
+			return reconcile.Result{}, err
+		}
+	}
+
 	// Set status to success
 	projectInstance.Status.Status = core.SuccessStatus
+
+	// Authenticate to cloudbilling
+	cb, err := GoogleCloudBillingClient(ctx, credentials.Spec.Key)
+
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Update billing account
+	err = UpdateProjectBilling(ctx, cb, projectInstance.Spec.BillingAccountName, projectId)
 
 	if err := r.client.Status().Update(ctx, projectInstance); err != nil {
 		logger.Error(err, "failed to update the resource status")
