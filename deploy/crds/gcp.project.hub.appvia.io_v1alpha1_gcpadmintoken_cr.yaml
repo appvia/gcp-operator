@@ -3,5 +3,6 @@ kind: GCPAdminToken
 metadata:
   name: example-gcpadmintoken
 spec:
-  # Add fields here
-  size: 3
+  token:
+  projectId:
+  organizationId:

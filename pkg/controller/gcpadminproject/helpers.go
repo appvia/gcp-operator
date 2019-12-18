@@ -240,3 +240,18 @@ func HttpUpdateBilling(projectId, billingAccountName, bearer string) (err error)
 	_, err = CallGoogleRest(bearer, url, "PUT", reqBody)
 	return err
 }
+
+func HttpEnableAPI(projectId, serviceName, bearer string) (operationName string, err error) {
+	url := "https://servicemanagement.googleapis.com/v1/services/" + serviceName + ":enable"
+
+	log.Println("Enabling service", serviceName, "for project", projectId)
+	resp, err := CallGoogleRest(bearer, url, "POST", make([]byte, 0))
+
+	var operation cloudresourcemanager.Operation
+
+	json.Unmarshal(resp, &operation)
+
+	operationName = operation.Name
+
+	return operationName, err
+}

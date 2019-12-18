@@ -3,5 +3,8 @@ kind: GCPAdminProject
 metadata:
   name: example-gcpadminproject
 spec:
-  # Add fields here
-  size: 3
+  projectId:
+  projectName:
+  parentType:
+  parentId:
+  billingAccountName:

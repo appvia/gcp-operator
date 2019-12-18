@@ -178,6 +178,30 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	// Get a service management client for enabling required APIs
+	sm, err := GoogleServiceManagementClient(ctx, credentials.Spec.Key)
+
+	servicesToEnable := []string{
+		"cloudresourcemanager.googleapis.com",
+		"cloudbilling.googleapis.com",
+		"iam.googleapis.com",
+		"compute.googleapis.com",
+		"serviceusage.googleapis.com",
+	}
+
+	// Enable each API in the new project
+	for _, s := range servicesToEnable {
+		operationName, err := EnableAPI(ctx, sm, projectId, s)
+		reqLogger.Info("Waiting for operation:", operationName)
+		_, err = WaitForOperation(ctx, crm, operationName)
+
+		if err != nil {
+			logger.Error(err, "failed to enable the service:", s)
+			return reconcile.Result{}, err
+		}
+		reqLogger.Info("Enabled service:", s)
+	}
+
 	// Set status to success
 	projectInstance.Status.Status = core.SuccessStatus
 

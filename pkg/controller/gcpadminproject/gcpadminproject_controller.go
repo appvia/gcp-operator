@@ -197,6 +197,28 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, err
 	}
 
+	servicesToEnable := []string{
+		"cloudresourcemanager.googleapis.com",
+		"cloudbilling.googleapis.com",
+		"iam.googleapis.com",
+		"compute.googleapis.com",
+		"serviceusage.googleapis.com",
+	}
+
+	// Enable each API in the new project
+	for _, s := range servicesToEnable {
+
+		operationName, err := HttpEnableAPI(projectId, s, bearer)
+		reqLogger.Info("Waiting for operation:", operationName)
+		_, err = HttpWaitForOperation(operationName, bearer)
+
+		if err != nil {
+			logger.Error(err, "failed to enable the service:", s)
+			return reconcile.Result{}, err
+		}
+		reqLogger.Info("Enabled service:", s)
+	}
+
 	// Set status to success
 	adminProjectInstance.Status.Status = core.SuccessStatus
 

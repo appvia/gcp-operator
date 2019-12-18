@@ -8,6 +8,7 @@ import (
 	"google.golang.org/api/cloudbilling/v1"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/option"
+	"google.golang.org/api/servicemanagement/v1"
 )
 
 // VerifyCredentials is responsible for verifying GCP creds
@@ -30,6 +31,17 @@ func GoogleCloudBillingClient(ctx context.Context, key string) (c *cloudbilling.
 	options := []option.ClientOption{option.WithCredentialsJSON([]byte(key))}
 
 	c, err = cloudbilling.NewService(ctx, options...)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	return c, nil
+}
+
+func GoogleServiceManagementClient(ctx context.Context, key string) (c *servicemanagement.APIService, err error) {
+	options := []option.ClientOption{option.WithCredentialsJSON([]byte(key))}
+
+	c, err = servicemanagement.NewService(ctx, options...)
 
 	if err != nil {
 		log.Fatal(err)
@@ -168,4 +180,18 @@ func UpdateProjectBilling(ctx context.Context, cb *cloudbilling.APIService, bill
 		log.Fatal(err)
 	}
 	return
+}
+
+func EnableAPI(ctx context.Context, sm *servicemanagement.APIService, projectId, serviceName string) (operationName string, err error) {
+	log.Println("Enabling service", serviceName, "for project", projectId)
+
+	resp, err := sm.Services.Enable(serviceName, &servicemanagement.EnableServiceRequest{
+		ConsumerId: "project:" + projectId,
+	}).Context(ctx).Do()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	operationName = resp.Name
+	return operationName, err
 }
