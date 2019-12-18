@@ -12,14 +12,6 @@ type GCPAdminTokenSpec struct {
 	// +kubebuilder:validation:Minimum=3
 	// +kubebuilder:validation:Required
 	Token string `json:"token"`
-	// ProjectId is the GCP project ID these credentials belong to
-	// +kubebuilder:validation:Minimum=3
-	// +kubebuilder:validation:Required
-	ProjectId string `json:"projectId"`
-	// Organization is the GCP org you wish the projects to reside within
-	// +kubebuilder:validation:Minimum=3
-	// +kubebuilder:validation:Required
-	OrganizationId string `json:"organizationId"`
 }
 
 // GCPAdminTokenStatus defines the observed state of GCPAdminToken
