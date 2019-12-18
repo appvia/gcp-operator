@@ -1,4 +1,4 @@
-apiVersion: gcp.project.hub.appvia.io/v1alpha1
+apiVersion: gcp.compute.hub.appvia.io/v1alpha1
 kind: GCPAdminProject
 metadata:
   name: example-gcpadminproject

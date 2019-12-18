@@ -1,8 +1,0 @@
-apiVersion: gcp.project.hub.appvia.io/v1alpha1
-kind: GCPAdminToken
-metadata:
-  name: example-gcpadmintoken
-spec:
-  token:
-  projectId:
-  organizationId:
