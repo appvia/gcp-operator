@@ -68,6 +68,15 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 	// Fetch the GCPAdminProject instance
 	adminProjectInstance := &gcpv1alpha1.GCPAdminProject{}
 
+	if err := r.client.Get(context.TODO(), request.NamespacedName, adminProjectInstance); err != nil {
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil
+		}
+		return reconcile.Result{}, err
+	}
+
+	reqLogger.Info("Found the GCPAdminProject")
+
 	adminToken := &gcpv1alpha1.GCPAdminToken{}
 
 	bearer := adminToken.Spec.Token
