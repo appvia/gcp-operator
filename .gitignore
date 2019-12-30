@@ -79,3 +79,5 @@ tags
 *gcp.compute.hub.appvia.io_v1alpha1_gcpadmintoken_cr.yaml
 # Ignore all custom resource files, may contain secrets..
 .*_cr.yaml
+deploy/crds/gcp.compute.hub.appvia.io_v1alpha1_gcpproject_cr.yaml
+deploy/crds/gcp.compute.hub.appvia.io_v1alpha1_gcpadminproject_cr.yaml
