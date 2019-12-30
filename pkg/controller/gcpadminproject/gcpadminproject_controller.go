@@ -79,7 +79,6 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 
 	adminToken := &gcpv1alpha1.GCPAdminToken{}
 
-	bearer := adminToken.Spec.Token
 
 	reference := types.NamespacedName{
 		Namespace: adminProjectInstance.Spec.Use.Namespace,
@@ -94,19 +93,11 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, err
 	}
 
-	// Attempt to retrieve the project
-	err = r.client.Get(context.TODO(), request.NamespacedName, adminProjectInstance)
+	reqLogger.Info("Found the GCPAdminToken")
 
-	if err != nil {
-		if errors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			return reconcile.Result{}, nil
-		}
-		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
-	}
+	bearer := adminToken.Spec.Token
+
+	reqLogger.Info(bearer)
 
 	// Get project details from spec
 	projectId, projectName, parentType, parentId := adminProjectInstance.Spec.ProjectId, adminProjectInstance.Spec.ProjectName, adminProjectInstance.Spec.ParentType, adminProjectInstance.Spec.ParentId

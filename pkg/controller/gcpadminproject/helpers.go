@@ -93,13 +93,21 @@ func HttpProjectExists(ctx context.Context, bearer, projectId string) (exists bo
 
 	log.Println("Listing projects matching filter id:" + projectId)
 
-	var projects []cloudresourcemanager.Project
+	type projectListResponse struct {
+		Projects []cloudresourcemanager.Project `json:"projects"`
+	}
+
+	var projects projectListResponse
 
 	resp, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0))
 
+	if err != nil {
+		return exists, err
+	}
+
 	json.Unmarshal(resp, &projects)
 
-	projectsReturned := len(projects)
+	projectsReturned := len(projects.Projects)
 
 	if projectsReturned == 0 {
 		log.Println("Project not found")
@@ -243,8 +251,18 @@ func HttpUpdateBilling(projectId, billingAccountName, bearer string) (err error)
 func HttpEnableAPI(projectId, serviceName, bearer string) (operationName string, err error) {
 	url := "https://servicemanagement.googleapis.com/v1/services/" + serviceName + ":enable"
 
+	type consumerBody struct {
+		id string `json:"consumerId"`
+	}
+
+	consumer := &consumerBody{
+		id: "project:" + projectId,
+	}
+
+	reqBody, err := json.Marshal(consumer)
+
 	log.Println("Enabling service", serviceName, "for project", projectId)
-	resp, err := CallGoogleRest(bearer, url, "POST", make([]byte, 0))
+	resp, err := CallGoogleRest(bearer, url, "POST", reqBody)
 
 	if err != nil {
 		return operationName, err
