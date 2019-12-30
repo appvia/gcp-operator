@@ -8,7 +8,7 @@ spec:
     kind: GCPAdminProject
     listKind: GCPAdminProjectList
     plural: gcpadminprojects
-    singular: gcpproject
+    singular: gcpadminproject
   scope: Namespaced
   subresources:
     status: {}
