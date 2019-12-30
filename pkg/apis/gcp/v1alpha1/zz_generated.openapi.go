@@ -11,12 +11,232 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPCredentials":       schema_pkg_apis_gcp_v1alpha1_GCPCredentials(ref),
-		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPCredentialsSpec":   schema_pkg_apis_gcp_v1alpha1_GCPCredentialsSpec(ref),
-		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPCredentialsStatus": schema_pkg_apis_gcp_v1alpha1_GCPCredentialsStatus(ref),
-		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPProject":           schema_pkg_apis_gcp_v1alpha1_GCPProject(ref),
-		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPProjectSpec":       schema_pkg_apis_gcp_v1alpha1_GCPProjectSpec(ref),
-		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPProjectStatus":     schema_pkg_apis_gcp_v1alpha1_GCPProjectStatus(ref),
+		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPAdminProject":       schema_pkg_apis_gcp_v1alpha1_GCPAdminProject(ref),
+		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPAdminProjectSpec":   schema_pkg_apis_gcp_v1alpha1_GCPAdminProjectSpec(ref),
+		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPAdminProjectStatus": schema_pkg_apis_gcp_v1alpha1_GCPAdminProjectStatus(ref),
+		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPAdminToken":         schema_pkg_apis_gcp_v1alpha1_GCPAdminToken(ref),
+		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPAdminTokenSpec":     schema_pkg_apis_gcp_v1alpha1_GCPAdminTokenSpec(ref),
+		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPAdminTokenStatus":   schema_pkg_apis_gcp_v1alpha1_GCPAdminTokenStatus(ref),
+		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPCredentials":        schema_pkg_apis_gcp_v1alpha1_GCPCredentials(ref),
+		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPCredentialsSpec":    schema_pkg_apis_gcp_v1alpha1_GCPCredentialsSpec(ref),
+		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPCredentialsStatus":  schema_pkg_apis_gcp_v1alpha1_GCPCredentialsStatus(ref),
+		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPProject":            schema_pkg_apis_gcp_v1alpha1_GCPProject(ref),
+		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPProjectSpec":        schema_pkg_apis_gcp_v1alpha1_GCPProjectSpec(ref),
+		"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPProjectStatus":      schema_pkg_apis_gcp_v1alpha1_GCPProjectStatus(ref),
+	}
+}
+
+func schema_pkg_apis_gcp_v1alpha1_GCPAdminProject(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "GCPAdminProject is the Schema for the gcpadminprojects API",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPAdminProjectSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPAdminProjectStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPAdminProjectSpec", "github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPAdminProjectStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_pkg_apis_gcp_v1alpha1_GCPAdminProjectSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "GCPAdminProjectSpec defines the desired state of GCPAdminProject",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"projectId": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ProjectId is the GCP project ID",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"projectName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ProjectName is the GCP project name",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"parentType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ParentType is the type of parent this project has Valid types are: \"organization\", \"folder\", and \"project\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"parentId": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ParentId is the type specific ID of the parent this project has",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"projectId", "projectName", "parentType", "parentId"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_gcp_v1alpha1_GCPAdminProjectStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "GCPAdminProjectStatus defines the observed state of GCPAdminProject",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status provides a overall status",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"status"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_gcp_v1alpha1_GCPAdminToken(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "GCPAdminToken is the Schema for the gcpadmintokens API",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPAdminTokenSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPAdminTokenStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPAdminTokenSpec", "github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1.GCPAdminTokenStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_pkg_apis_gcp_v1alpha1_GCPAdminTokenSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "GCPAdminTokenSpec defines the desired state of GCPAdminToken",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"token": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Token is the bearer token used to setup the initial GCP admin project and service account You must grab a token using `gcloud auth print-access-token you@example.com`",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"projectId": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ProjectId is the GCP project ID these credentials belong to",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"organizationId": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Organization is the GCP org you wish the projects to reside within",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"token", "projectId", "organizationId"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_gcp_v1alpha1_GCPAdminTokenStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "GCPAdminTokenStatus defines the observed state of GCPAdminToken",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"verified": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Verified checks that the token is ok and valid",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status provides a overall status",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"verified", "status"},
+			},
+		},
 	}
 }
 
@@ -70,6 +290,30 @@ func schema_pkg_apis_gcp_v1alpha1_GCPCredentialsSpec(ref common.ReferenceCallbac
 			SchemaProps: spec.SchemaProps{
 				Description: "GCPCredentialsSpec defines the desired state of GCPCredentials",
 				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Key is the credential used to create GCP projects You must create a service account with resourcemanager.projectCreator and billing.user roles at the organization level and use the JSON payload here",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"projectId": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ProjectId is the GCP project ID these credentials belong to",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"organizationId": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Organization is the GCP org you wish the projects to reside within",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"key", "projectId", "organizationId"},
 			},
 		},
 	}
@@ -81,6 +325,23 @@ func schema_pkg_apis_gcp_v1alpha1_GCPCredentialsStatus(ref common.ReferenceCallb
 			SchemaProps: spec.SchemaProps{
 				Description: "GCPCredentialsStatus defines the observed state of GCPCredentials",
 				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"verified": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Verified checks that the credentials are ok and valid",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status provides a overall status",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"verified", "status"},
 			},
 		},
 	}
@@ -136,6 +397,37 @@ func schema_pkg_apis_gcp_v1alpha1_GCPProjectSpec(ref common.ReferenceCallback) c
 			SchemaProps: spec.SchemaProps{
 				Description: "GCPProjectSpec defines the desired state of GCPProject",
 				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"projectId": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ProjectId is the GCP project ID",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"projectName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ProjectName is the GCP project name",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"parentType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ParentType is the type of parent this project has Valid types are: \"organization\", \"folder\", and \"project\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"parentId": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ParentId is the type specific ID of the parent this project has",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"projectId", "projectName", "parentType", "parentId"},
 			},
 		},
 	}
@@ -147,6 +439,16 @@ func schema_pkg_apis_gcp_v1alpha1_GCPProjectStatus(ref common.ReferenceCallback)
 			SchemaProps: spec.SchemaProps{
 				Description: "GCPProjectStatus defines the observed state of GCPProject",
 				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status provides a overall status",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"status"},
 			},
 		},
 	}
