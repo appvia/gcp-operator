@@ -1,0 +1,104 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: gcpadminprojects.gcp.compute.hub.appvia.io
+spec:
+  group: gcp.compute.hub.appvia.io
+  names:
+    kind: GCPAdminProject
+    listKind: GCPAdminProjectList
+    plural: gcpadminprojects
+    singular: gcpadminproject
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: GCPAdminProject is the Schema for the gcpadminprojects API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: GCPAdminProjectSpec defines the desired state of GCPAdminProject
+          properties:
+            billingAccountName:
+              description: BillingAccountName is the resource name of the billing
+                account associated with the project
+              type: string
+            parentId:
+              description: ParentId is the type specific ID of the parent this project
+                has
+              type: string
+            parentType:
+              description: 'ParentType is the type of parent this project has Valid
+                types are: "organization", "folder", and "project"'
+              enum:
+              - organization
+              - folder
+              - project
+              type: string
+            projectId:
+              description: ProjectId is the GCP project ID
+              type: string
+            projectName:
+              description: ProjectName is the GCP project name
+              type: string
+            use:
+              description: GCPAdminTokens is a reference to the gcp admin tokens object
+                to use
+              properties:
+                group:
+                  description: Group is the api group
+                  type: string
+                kind:
+                  description: Kind is the name of the resource under the group
+                  type: string
+                name:
+                  description: Name is name of the resource
+                  type: string
+                namespace:
+                  description: Namespace is the location of the object
+                  type: string
+                version:
+                  description: Version is the group version
+                  type: string
+              required:
+              - group
+              - kind
+              - name
+              - namespace
+              - version
+              type: object
+          required:
+          - billingAccountName
+          - parentId
+          - parentType
+          - projectId
+          - projectName
+          - use
+          type: object
+        status:
+          description: GCPAdminProjectStatus defines the observed state of GCPAdminProject
+          properties:
+            status:
+              description: Status provides a overall status
+              type: string
+          required:
+          - status
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true

@@ -69,6 +69,13 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 	// Fetch the GCPProject instance
 	projectInstance := &gcpv1alpha1.GCPProject{}
 
+	if err := r.client.Get(context.TODO(), request.NamespacedName, projectInstance); err != nil {
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil
+		}
+		return reconcile.Result{}, err
+	}
+
 	credentials := &gcpv1alpha1.GCPCredentials{}
 
 	reference := types.NamespacedName{
