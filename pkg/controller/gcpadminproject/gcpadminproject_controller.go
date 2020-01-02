@@ -79,7 +79,6 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 
 	adminToken := &gcpv1alpha1.GCPAdminToken{}
 
-
 	reference := types.NamespacedName{
 		Namespace: adminProjectInstance.Spec.Use.Namespace,
 		Name:      adminProjectInstance.Spec.Use.Name,
@@ -96,8 +95,6 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 	reqLogger.Info("Found the GCPAdminToken")
 
 	bearer := adminToken.Spec.Token
-
-	reqLogger.Info(bearer)
 
 	// Get project details from spec
 	projectId, projectName, parentType, parentId := adminProjectInstance.Spec.ProjectId, adminProjectInstance.Spec.ProjectName, adminProjectInstance.Spec.ParentType, adminProjectInstance.Spec.ParentId

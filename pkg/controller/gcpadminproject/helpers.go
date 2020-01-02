@@ -87,10 +87,6 @@ func HttpUpdateProject(ctx context.Context, bearer, projectId, projectName, pare
 func HttpProjectExists(ctx context.Context, bearer, projectId string) (exists bool, err error) {
 	url := "https://cloudresourcemanager.googleapis.com/v1/projects?filter=id:" + projectId
 
-	if err != nil {
-		return exists, err
-	}
-
 	log.Println("Listing projects matching filter id:" + projectId)
 
 	type projectListResponse struct {
