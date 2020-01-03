@@ -6,6 +6,7 @@ import (
 	gcpv1alpha1 "github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
 	core "github.com/appvia/hub-apis/pkg/apis/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -75,7 +76,7 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, err
 	}
 
-	reqLogger.Info("Found the GCPAdminProject")
+	reqLogger.Info("Found the GCPAdminProject CR")
 
 	adminToken := &gcpv1alpha1.GCPAdminToken{}
 
@@ -112,7 +113,8 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 		billingAccountName, err := HttpGetBilling(projectId, bearer)
 
 		if projectName != project.Name || parentType != project.Parent.Type || parentId != project.Parent.Id {
-			// Project exists but state differs
+			reqLogger.Info("Project exists but state differs, updating")
+
 			updateOperationName, err := HttpUpdateProject(ctx, bearer, projectId, projectName, parentId, parentType)
 
 			// Set status to pending
@@ -124,16 +126,20 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 			}
 
 			// Wait for project update operation to complete
-			_, err = HttpWaitForOperation(updateOperationName, bearer)
+			_, err = HttpWaitForCRMOperation(updateOperationName, bearer)
 
 			if err != nil {
 				return reconcile.Result{}, err
 			}
+		} else {
+			reqLogger.Info("Project exists and state matches")
 		}
 
-		if billingAccountName != adminProjectInstance.Spec.BillingAccountName {
-			// Project exists but billing differs
-			err = HttpUpdateBilling(projectId, billingAccountName, bearer)
+		if billingAccountName != "billingAccounts/"+adminProjectInstance.Spec.BillingAccountName {
+			reqLogger.Info("Project exists but billing account doesnt match, updating")
+
+			err = HttpUpdateBilling(projectId, adminProjectInstance.Spec.BillingAccountName, bearer)
+
 			if err != nil {
 				return reconcile.Result{}, err
 			}
@@ -145,6 +151,8 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 				return reconcile.Result{}, err
 			}
 		}
+
+		reqLogger.Info("Project exists and billing account matches")
 
 		// Set status to success
 		adminProjectInstance.Status.Status = core.SuccessStatus
@@ -158,7 +166,7 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, nil
 	}
 
-	// Create project
+	// Project doesnt exist, create it
 	operationName, err := HttpCreateProject(bearer, projectId, projectName, parentId, parentType)
 
 	if err != nil {
@@ -175,7 +183,7 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 	}
 
 	// Wait for operation to complete
-	_, err = HttpWaitForOperation(operationName, bearer)
+	_, err = HttpWaitForCRMOperation(operationName, bearer)
 
 	if err != nil {
 		return reconcile.Result{}, err
@@ -203,19 +211,54 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 
 	// Enable each API in the new project
 	for _, s := range servicesToEnable {
-
 		operationName, err := HttpEnableAPI(projectId, s, bearer)
 		reqLogger.Info("Waiting for operation:", operationName)
-		_, err = HttpWaitForOperation(operationName, bearer)
+		_, err = HttpWaitForSMOperation(operationName, bearer)
 
 		if err != nil {
 			logger.Error(err, "failed to enable the service:", s)
 			return reconcile.Result{}, err
 		}
-		reqLogger.Info("Enabled service:", s)
+		reqLogger.Info("Enabled service: " + s)
 	}
 
-	// Set status to success
+	// Create service account, assign permissions, create a key
+	reqLogger.Info("Creating service account: " + adminProjectInstance.Spec.ServiceAccountName)
+	serviceAccount, err := HttpCreateServiceAccount(bearer, projectId, adminProjectInstance.Spec.ServiceAccountName, "Created by the Appvia Hub")
+	reqLogger.Info("Creating service account key for: " + adminProjectInstance.Spec.ServiceAccountName)
+	key, err := HttpCreateServiceAccountKey(bearer, projectId, adminProjectInstance.Spec.ServiceAccountName)
+	reqLogger.Info("Assigning project permissions to service account: " + serviceAccount.Email)
+	err = HttpSetProjectIam(bearer, serviceAccount.Email, projectId)
+
+	// Commented until test organization setup TODO: uncomment and test
+	// reqLogger.Info("Assigning org permissions to service account: " + serviceAccount.Email)
+	// err = HttpSetOrgIam(bearer, serviceAccount.Email, parentId)
+
+	// Create the credential as a CR
+	reqLogger.Info("Creating the GCPCredentials CR: hub-admin-credentials in namespace: " + request.Namespace)
+
+	adminCredential := &gcpv1alpha1.GCPCredentials{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "hub-admin-credentials", // TODO: rename or add to spec
+			Namespace: request.Namespace,
+		},
+		Spec: gcpv1alpha1.GCPCredentialsSpec{
+			Key:            key,
+			ProjectId:      projectId,
+			OrganizationId: parentId,
+		},
+		Status: gcpv1alpha1.GCPCredentialsStatus{
+			Status: "Success",
+		},
+	}
+
+	err = r.client.Create(ctx, adminCredential)
+
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Set project status to success
 	adminProjectInstance.Status.Status = core.SuccessStatus
 
 	if err := r.client.Status().Update(ctx, adminProjectInstance); err != nil {
@@ -223,6 +266,5 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 
 		return reconcile.Result{}, err
 	}
-
 	return reconcile.Result{}, nil
 }
