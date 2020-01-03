@@ -2,6 +2,7 @@ package gcpproject
 
 import (
 	"context"
+	"encoding/base64"
 
 	gcpv1alpha1 "github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
 	core "github.com/appvia/hub-apis/pkg/apis/core/v1"
@@ -76,6 +77,8 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	reqLogger.Info("Found GCPProject CR")
+
 	credentials := &gcpv1alpha1.GCPCredentials{}
 
 	reference := types.NamespacedName{
@@ -91,26 +94,31 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	reqLogger.Info("Found GCPCredentials CR")
+
+	decoded, err := base64.StdEncoding.DecodeString(credentials.Spec.Key)
+
+	keyString := string(decoded)
+
 	// Authenticate to cloudresourcemanager
-	crm, err := GoogleCRMClient(ctx, credentials.Spec.Key)
+	crm, err := GoogleCRMClient(ctx, keyString)
 
 	if err != nil {
+		logger.Error(err, "Failed to obtain CRM client")
 		return reconcile.Result{}, err
 	}
 
-	// Attempt to retrieve the project
-	err = r.client.Get(context.TODO(), request.NamespacedName, projectInstance)
+	reqLogger.Info("Authenticated to CRM")
+
+	// Authenticate to cloudbilling
+	cb, err := GoogleCloudBillingClient(ctx, keyString)
 
 	if err != nil {
-		if errors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			return reconcile.Result{}, nil
-		}
-		// Error reading the object - requeue the request.
+		logger.Error(err, "Failed to obtain CB client")
 		return reconcile.Result{}, err
 	}
+
+	reqLogger.Info("Authenticated to CB")
 
 	// Get project details from spec
 	projectId, projectName, parentType, parentId := projectInstance.Spec.ProjectId, projectInstance.Spec.ProjectName, projectInstance.Spec.ParentType, projectInstance.Spec.ParentId
@@ -125,28 +133,48 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 	if projectExists {
 		project, err := GetProject(ctx, crm, projectId)
 
-		if projectName == project.Name && parentType == project.Parent.Type && parentId == project.Parent.Id {
-			// Exists and state as desired
-			return reconcile.Result{}, nil
+		billingAccount, err := GetProjectBilling(ctx, cb, projectId)
+
+		if projectName != project.Name || parentType != project.Parent.Type || parentId != project.Parent.Id {
+			// Exists but state differs
+			updateOperationName, err := UpdateProject(ctx, crm, projectId, projectName, parentId, parentType)
+
+			// Set status to pending
+			projectInstance.Status.Status = core.PendingStatus
+
+			if err := r.client.Status().Update(ctx, projectInstance); err != nil {
+				logger.Error(err, "failed to update the resource status")
+
+				return reconcile.Result{}, err
+			}
+
+			// Wait for operation to complete
+			_, err = WaitForOperationCRM(ctx, crm, updateOperationName)
+
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+
+			if err := r.client.Status().Update(ctx, projectInstance); err != nil {
+				logger.Error(err, "failed to update the resource status")
+
+				return reconcile.Result{}, err
+			}
+		} else {
+			reqLogger.Info("Project exists and state matches")
 		}
 
-		// Exists but state differs
-		updateOperationName, err := UpdateProject(ctx, crm, projectId, projectName, parentId, parentType)
+		if billingAccount.Name != "billingAccounts/"+projectInstance.Spec.BillingAccountName {
+			reqLogger.Info("Project exists but billing account doesnt match, updating")
 
-		// Set status to pending
-		projectInstance.Status.Status = core.PendingStatus
+			err = UpdateProjectBilling(ctx, cb, projectInstance.Spec.BillingAccountName, projectId)
 
-		if err := r.client.Status().Update(ctx, projectInstance); err != nil {
-			logger.Error(err, "failed to update the resource status")
-
-			return reconcile.Result{}, err
-		}
-
-		// Wait for operation to complete
-		_, err = WaitForOperation(ctx, crm, updateOperationName)
-
-		if err != nil {
-			return reconcile.Result{}, err
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+			reqLogger.Info("Project billing updated")
+		} else {
+			reqLogger.Info("Project exists and billing account matches")
 		}
 
 		// Set status to success
@@ -154,14 +182,13 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 
 		if err := r.client.Status().Update(ctx, projectInstance); err != nil {
 			logger.Error(err, "failed to update the resource status")
-
 			return reconcile.Result{}, err
 		}
 
 		return reconcile.Result{}, nil
 	}
 
-	// Create project
+	// Project doesnt exist yet, create it
 	operationName, err := CreateProject(ctx, crm, projectId, projectName, parentId, parentType)
 
 	if err != nil {
@@ -178,7 +205,7 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Wait for operation to complete
-	_, err = WaitForOperation(ctx, crm, operationName)
+	_, err = WaitForOperationCRM(ctx, crm, operationName)
 
 	if err != nil {
 		return reconcile.Result{}, err
@@ -207,7 +234,7 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 				return err
 			}
 			reqLogger.Info("Waiting for operation:", name)
-			if _, err = WaitForOperation(ctx, crm, name); err != nil {
+			if _, err = WaitForOperationSM(ctx, sm, name); err != nil {
 				return err
 			}
 			reqLogger.Info("Enabled service:", s)
@@ -221,17 +248,7 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 	}
 
-	// Set status to success
-	projectInstance.Status.Status = core.SuccessStatus
-
-	// Authenticate to cloudbilling
-	cb, err := GoogleCloudBillingClient(ctx, credentials.Spec.Key)
-
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	// Update billing account
+	// Set billing
 	err = UpdateProjectBilling(ctx, cb, projectInstance.Spec.BillingAccountName, projectId)
 
 	if err := r.client.Status().Update(ctx, projectInstance); err != nil {
@@ -239,6 +256,9 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 
 		return reconcile.Result{}, err
 	}
+
+	// Set status to success
+	projectInstance.Status.Status = core.SuccessStatus
 
 	return reconcile.Result{}, nil
 }
