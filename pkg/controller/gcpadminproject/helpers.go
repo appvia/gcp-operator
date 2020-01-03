@@ -8,12 +8,14 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
 	cloudbilling "google.golang.org/api/cloudbilling/v1"
-	"google.golang.org/api/cloudresourcemanager/v1"
+	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 	iam "google.golang.org/api/iam/v1"
+	servicemanagement "google.golang.org/api/servicemanagement/v1"
 )
 
 // VerifyCredentials is responsible for verifying GCP creds
@@ -87,19 +89,23 @@ func HttpUpdateProject(ctx context.Context, bearer, projectId, projectName, pare
 func HttpProjectExists(ctx context.Context, bearer, projectId string) (exists bool, err error) {
 	url := "https://cloudresourcemanager.googleapis.com/v1/projects?filter=id:" + projectId
 
+	log.Println("Listing projects matching filter id:" + projectId)
+
+	type projectListResponse struct {
+		Projects []cloudresourcemanager.Project `json:"projects"`
+	}
+
+	var projects projectListResponse
+
+	resp, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0))
+
 	if err != nil {
 		return exists, err
 	}
 
-	log.Println("Listing projects matching filter id:" + projectId)
-
-	var projects []cloudresourcemanager.Project
-
-	resp, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0))
-
 	json.Unmarshal(resp, &projects)
 
-	projectsReturned := len(projects)
+	projectsReturned := len(projects.Projects)
 
 	if projectsReturned == 0 {
 		log.Println("Project not found")
@@ -137,18 +143,27 @@ func HttpGetProject(ctx context.Context, bearer, projectId string) (exists bool,
 	return exists, project, err
 }
 
-func HttpCreateServiceAccount(bearer, projectId, serviceAccountName, displayName string) (err error) {
+func HttpCreateServiceAccount(bearer, projectId, serviceAccountName, displayName string) (serviceAccount iam.ServiceAccount, err error) {
 	url := "https://iam.googleapis.com/v1/projects/" + projectId + "/serviceAccounts"
-	serviceAccount := &iam.CreateServiceAccountRequest{
+	serviceAccountRequest := &iam.CreateServiceAccountRequest{
 		AccountId: serviceAccountName,
 		ServiceAccount: &iam.ServiceAccount{
 			DisplayName: displayName,
 		},
 	}
-	reqBody, err := json.Marshal(serviceAccount)
+	reqBody, err := json.Marshal(serviceAccountRequest)
 	fmt.Println("Creating service account", serviceAccountName, "in project", projectId)
-	_, err = CallGoogleRest(bearer, url, "POST", reqBody)
-	return err
+	resBody, err := CallGoogleRest(bearer, url, "POST", reqBody)
+	err = json.Unmarshal(resBody, &serviceAccount)
+	return serviceAccount, err
+}
+
+func HttpGetServiceAccount(bearer, projectId, serviceAccountName string) (serviceAccount iam.ServiceAccount, err error) {
+	url := "https://iam.googleapis.com/v1/projects/" + projectId + "/serviceAccounts/" + serviceAccountName
+	fmt.Println("Retrieving service account", serviceAccountName, "in project", projectId)
+	respBody, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0))
+	err = json.Unmarshal(respBody, &serviceAccount)
+	return serviceAccount, err
 }
 
 func HttpCreateServiceAccountKey(bearer, projectId, serviceAccountName string) (key string, err error) {
@@ -160,41 +175,127 @@ func HttpCreateServiceAccountKey(bearer, projectId, serviceAccountName string) (
 	return serviceAccountKey.PrivateKeyData, err
 }
 
+func dedupePolicy(policy cloudresourcemanager.Policy) (uniquePolicy cloudresourcemanager.Policy) {
+	for _, b := range policy.Bindings {
+		// Append to new policy if not in already
+		if !bindingInPolicy(b, uniquePolicy) {
+			uniquePolicy.Bindings = append(uniquePolicy.Bindings, b)
+		}
+	}
+	return uniquePolicy
+}
+
+func bindingInPolicy(binding *cloudresourcemanager.Binding, policy cloudresourcemanager.Policy) bool {
+	for _, b := range policy.Bindings {
+		if reflect.DeepEqual(binding.Members, b.Members) && binding.Condition == b.Condition && binding.Role == b.Role {
+			// Binding in policy
+			return true
+		}
+	}
+	// Binding not in policy
+	return false
+}
+
+func HttpGetProjectIam(bearer, projectId string) (policy cloudresourcemanager.Policy, err error) {
+	url := "https://cloudresourcemanager.googleapis.com/v1/projects/" + projectId + ":getIamPolicy"
+	resBody, err := CallGoogleRest(bearer, url, "POST", make([]byte, 0))
+	json.Unmarshal(resBody, &policy)
+	return policy, err
+}
+
 func HttpSetProjectIam(bearer, serviceAccountEmail, projectId string) (err error) {
-	url := "https://cloudresourcemanager.googleapis.com/v1/projects/" + projectId + ":setIamPolicy"
+	// Get existing policy and append new required bindings
+	existingPolicy, err := HttpGetProjectIam(bearer, projectId)
+	if err != nil {
+		return err
+	}
 	binding := &cloudresourcemanager.Binding{
-		Members: []string{serviceAccountEmail},
+		Members: []string{"serviceAccount:" + serviceAccountEmail},
 		Role:    "roles/viewer",
 	}
-	policy := &cloudresourcemanager.Policy{
-		Bindings: []*cloudresourcemanager.Binding{binding},
+	allBindings := append(existingPolicy.Bindings, binding)
+	updatedPolicy := cloudresourcemanager.Policy{
+		Bindings: allBindings,
 	}
-	reqBody, err := json.Marshal(policy)
+	finalPolicy := dedupePolicy(updatedPolicy)
+	setIamPolicyRequest := &cloudresourcemanager.SetIamPolicyRequest{
+		Policy: &finalPolicy,
+	}
+	reqBody, err := json.Marshal(setIamPolicyRequest)
+	if err != nil {
+		return err
+	}
+	url := "https://cloudresourcemanager.googleapis.com/v1/projects/" + projectId + ":setIamPolicy"
 	_, err = CallGoogleRest(bearer, url, "POST", reqBody)
 	return err
+}
+
+func HttpGetOrgIam(bearer, orgId string) (policy cloudresourcemanager.Policy, err error) {
+	url := "https://cloudresourcemanager.googleapis.com/v1/organizations/" + orgId + ":getIamPolicy"
+	resBody, err := CallGoogleRest(bearer, url, "POST", make([]byte, 0))
+	json.Unmarshal(resBody, &policy)
+	return policy, err
 }
 
 func HttpSetOrgIam(bearer, serviceAccountEmail, orgId string) (err error) {
-	url := "https://cloudresourcemanager.googleapis.com/v1/organizations/" + orgId + ":setIamPolicy"
+	// Get existing policy and append new required bindings
+	existingPolicy, err := HttpGetProjectIam(bearer, orgId)
+	if err != nil {
+		return err
+	}
 	billingBinding := &cloudresourcemanager.Binding{
-		Members: []string{serviceAccountEmail},
+		Members: []string{"serviceAccount:" + serviceAccountEmail},
 		Role:    "roles/billing.user",
 	}
 	projectCreatorBinding := &cloudresourcemanager.Binding{
-		Members: []string{serviceAccountEmail},
+		Members: []string{"serviceAccount:" + serviceAccountEmail},
 		Role:    "roles/resourcemanager.projectCreator",
 	}
-	policy := &cloudresourcemanager.Policy{
-		Bindings: []*cloudresourcemanager.Binding{billingBinding, projectCreatorBinding},
+	allBindings := append(existingPolicy.Bindings, billingBinding, projectCreatorBinding)
+	updatedPolicy := cloudresourcemanager.Policy{
+		Bindings: allBindings,
 	}
-	reqBody, err := json.Marshal(policy)
-	log.Println("Setting org policy roles/billing.user and roles/resourcemanager.projectCreator")
+	finalPolicy := dedupePolicy(updatedPolicy)
+	setIamPolicyRequest := &cloudresourcemanager.SetIamPolicyRequest{
+		Policy: &finalPolicy,
+	}
+	reqBody, err := json.Marshal(setIamPolicyRequest)
+	if err != nil {
+		return err
+	}
+	url := "https://cloudresourcemanager.googleapis.com/v1/organizations/" + orgId + ":setIamPolicy"
 	_, err = CallGoogleRest(bearer, url, "POST", reqBody)
 	return err
 }
 
-func HttpWaitForOperation(operationName, bearer string) (complete bool, err error) {
+func HttpWaitForSMOperation(operationName, bearer string) (complete bool, err error) {
+	url := "https://servicemanagement.googleapis.com/v1/" + operationName
+	log.Println("Calling URL:" + url)
+	for {
+		log.Println("Checking the status of operation", operationName)
+		resBody, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0)) // TODO: do this better
+		if err != nil {
+			log.Println("Exiting due to remote err")
+			return false, err
+		}
+		var operation servicemanagement.Operation
+		json.Unmarshal(resBody, &operation)
+		if err != nil {
+			log.Println("Exiting due to unmarshal error")
+			return false, err
+		}
+		if operation.Done {
+			break
+		}
+		time.Sleep(1000 * time.Millisecond)
+	}
+
+	return true, err
+}
+
+func HttpWaitForCRMOperation(operationName, bearer string) (complete bool, err error) {
 	url := "https://cloudresourcemanager.googleapis.com/v1/" + operationName
+	log.Println("Calling URL:" + url)
 	for {
 		log.Println("Checking the status of operation", operationName)
 		resBody, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0)) // TODO: do this better
@@ -204,10 +305,14 @@ func HttpWaitForOperation(operationName, bearer string) (complete bool, err erro
 		}
 		var operation cloudresourcemanager.Operation
 		json.Unmarshal(resBody, &operation)
+		if err != nil {
+			log.Println("Exiting due to unmarshal error")
+			return false, err
+		}
 		if operation.Done {
 			break
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond)
 	}
 
 	return true, err
@@ -223,6 +328,11 @@ func HttpGetBilling(projectId, bearer string) (billingAccountName string, err er
 	resp, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0))
 
 	err = json.Unmarshal(resp, &billingInfo)
+
+	if err != nil {
+		log.Println("Unmarshal error")
+		return billingAccountName, err
+	}
 
 	return billingInfo.BillingAccountName, err
 }
@@ -243,8 +353,23 @@ func HttpUpdateBilling(projectId, billingAccountName, bearer string) (err error)
 func HttpEnableAPI(projectId, serviceName, bearer string) (operationName string, err error) {
 	url := "https://servicemanagement.googleapis.com/v1/services/" + serviceName + ":enable"
 
+	type consumerBody struct {
+		ConsumerId string `json:"consumerId"`
+	}
+
+	consumer := &consumerBody{
+		ConsumerId: "project:" + projectId,
+	}
+
+	reqBody, err := json.Marshal(consumer)
+
+	if err != nil {
+		return operationName, err
+	}
+
 	log.Println("Enabling service", serviceName, "for project", projectId)
-	resp, err := CallGoogleRest(bearer, url, "POST", make([]byte, 0))
+
+	resp, err := CallGoogleRest(bearer, url, "POST", reqBody)
 
 	if err != nil {
 		return operationName, err

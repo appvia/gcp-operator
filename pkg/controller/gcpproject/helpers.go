@@ -6,10 +6,11 @@ import (
 
 	"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
 	"golang.org/x/net/context"
-	"google.golang.org/api/cloudbilling/v1"
-	"google.golang.org/api/cloudresourcemanager/v1"
+	cloudbilling "google.golang.org/api/cloudbilling/v1"
+	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
-	"google.golang.org/api/servicemanagement/v1"
+	servicemanagement "google.golang.org/api/servicemanagement/v1"
 )
 
 // VerifyCredentials is responsible for verifying GCP creds
@@ -39,15 +40,26 @@ func GoogleCloudBillingClient(ctx context.Context, key string) (c *cloudbilling.
 	return c, nil
 }
 
-func GoogleServiceManagementClient(ctx context.Context, key string) (c *servicemanagement.APIService, err error) {
+func GoogleServiceManagementClient(ctx context.Context, key string) (sm *servicemanagement.APIService, err error) {
 	options := []option.ClientOption{option.WithCredentialsJSON([]byte(key))}
 
-	c, err = servicemanagement.NewService(ctx, options...)
+	sm, err = servicemanagement.NewService(ctx, options...)
 
 	if err != nil {
-		return c, err
+		return sm, err
 	}
-	return c, nil
+	return sm, nil
+}
+
+func GoogleIAMClient(ctx context.Context, key string) (i *iam.Service, err error) {
+	options := []option.ClientOption{option.WithCredentialsJSON([]byte(key))}
+
+	i, err = iam.NewService(ctx, options...)
+
+	if err != nil {
+		return i, err
+	}
+	return i, nil
 }
 
 func ProjectExists(ctx context.Context, crm *cloudresourcemanager.Service, projectId string) (exists bool, err error) {
@@ -139,7 +151,7 @@ func UpdateProject(ctx context.Context, crm *cloudresourcemanager.Service, proje
 	return resp.Name, nil
 }
 
-func WaitForOperation(ctx context.Context, crm *cloudresourcemanager.Service, operationName string) (complete bool, err error) {
+func WaitForOperationCRM(ctx context.Context, crm *cloudresourcemanager.Service, operationName string) (complete bool, err error) {
 
 	log.Println("Waiting for operation", operationName)
 
@@ -152,10 +164,37 @@ func WaitForOperation(ctx context.Context, crm *cloudresourcemanager.Service, op
 		if resp.Done == true {
 			break
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond)
 	}
 	log.Println("Operation complete")
 	return
+}
+
+func WaitForOperationSM(ctx context.Context, sm *servicemanagement.APIService, operationName string) (complete bool, err error) {
+
+	log.Println("Waiting for operation", operationName)
+
+	for {
+		resp, err := sm.Operations.Get(operationName).Context(ctx).Do()
+		if err != nil {
+			return false, err
+		}
+		if resp.Done == true {
+			break
+		}
+		time.Sleep(1000 * time.Millisecond)
+	}
+	log.Println("Operation complete")
+	return
+}
+
+func GetProjectBilling(ctx context.Context, cb *cloudbilling.APIService, projectId string) (billingInfo *cloudbilling.ProjectBillingInfo, err error) {
+	billingInfo, err = cb.Projects.GetBillingInfo(projectId).Context(ctx).Do()
+
+	if err != nil {
+		return billingInfo, err
+	}
+	return billingInfo, nil
 }
 
 func UpdateProjectBilling(ctx context.Context, cb *cloudbilling.APIService, billingAccountName string, projectId string) (err error) {
@@ -183,4 +222,30 @@ func EnableAPI(ctx context.Context, sm *servicemanagement.APIService, projectId,
 		return operationName, err
 	}
 	return resp.Name, err
+}
+
+func CreateServiceAccount(ctx context.Context, i *iam.Service, projectId, name, displayName string) (*iam.ServiceAccount, error) {
+	request := &iam.CreateServiceAccountRequest{
+		AccountId: name,
+		ServiceAccount: &iam.ServiceAccount{
+			DisplayName: displayName,
+		},
+	}
+	account, err := i.Projects.ServiceAccounts.Create("projects/"+projectId, request).Do()
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("Created service account: %v", account)
+	return account, nil
+}
+
+func CreateServiceAccountKey(ctx context.Context, i *iam.Service, projectId, serviceAccountName string) (key string, err error) {
+	resource := "projects/" + projectId + "/serviceAccounts/" + serviceAccountName
+	request := &iam.CreateServiceAccountKeyRequest{}
+	serviceAccount, err := i.Projects.ServiceAccounts.Keys.Create(resource, request).Do()
+	if err != nil {
+		return key, err
+	}
+	log.Printf("Created key: %v", serviceAccountName)
+	return serviceAccount.PrivateKeyData, nil
 }
