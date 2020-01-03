@@ -263,11 +263,6 @@ func HttpSetOrgIam(bearer, serviceAccountEmail, orgId string) (err error) {
 	if err != nil {
 		return err
 	}
-	log.Println("Printing the org policy out")
-	log.Println(string(reqBody))
-	if err != nil {
-		return err
-	}
 	url := "https://cloudresourcemanager.googleapis.com/v1/organizations/" + orgId + ":setIamPolicy"
 	_, err = CallGoogleRest(bearer, url, "POST", reqBody)
 	return err
@@ -350,9 +345,6 @@ func HttpUpdateBilling(projectId, billingAccountName, bearer string) (err error)
 		BillingEnabled:     true,
 	}
 	reqBody, err := json.Marshal(billingInfo)
-	log.Println("Printing billing body")
-	log.Println(reqBody)
-	log.Println(billingInfo)
 	log.Println("Updating billing account for", projectId, "to", billingAccountName)
 	_, err = CallGoogleRest(bearer, url, "PUT", reqBody)
 	return err
