@@ -6,6 +6,7 @@ import (
 
 	gcpv1alpha1 "github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
 	core "github.com/appvia/hub-apis/pkg/apis/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -254,6 +255,49 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 	if err := r.client.Status().Update(ctx, projectInstance); err != nil {
 		logger.Error(err, "failed to update the resource status")
 
+		return reconcile.Result{}, err
+	}
+
+	iam, err := GoogleIAMClient(ctx, keyString)
+
+	// Create service account and then create a key
+	reqLogger.Info("Creating service account: " + projectInstance.Spec.ServiceAccountName)
+	_, err = CreateServiceAccount(ctx, iam, projectId, projectInstance.Spec.ServiceAccountName, "Created by the Appvia Hub")
+
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	reqLogger.Info("Creating service account key for: " + projectInstance.Spec.ServiceAccountName)
+	key, err := CreateServiceAccountKey(ctx, iam, projectId, projectInstance.Spec.ServiceAccountName)
+
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// TODO: set project and potentially org permissions for service account
+
+	// Create the credential as a CR
+	reqLogger.Info("Creating the GCPCredentials CR:" + projectId + "-gcpcreds in namespace: " + request.Namespace)
+
+	serviceAccountCredential := &gcpv1alpha1.GCPCredentials{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      projectId + "-gcpcreds",
+			Namespace: request.Namespace,
+		},
+		Spec: gcpv1alpha1.GCPCredentialsSpec{
+			Key:            key,
+			ProjectId:      projectId,
+			OrganizationId: parentId,
+		},
+		Status: gcpv1alpha1.GCPCredentialsStatus{
+			Status: "Success",
+		},
+	}
+
+	err = r.client.Create(ctx, serviceAccountCredential)
+
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 

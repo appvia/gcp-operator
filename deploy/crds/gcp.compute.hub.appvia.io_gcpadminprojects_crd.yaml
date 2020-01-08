@@ -53,6 +53,9 @@ spec:
             projectName:
               description: ProjectName is the GCP project name
               type: string
+            serviceAccountName:
+              description: ServiceAccountName is the name given to the GCP service account
+              type: string
             use:
               description: GCPAdminTokens is a reference to the gcp admin tokens object
                 to use
@@ -85,6 +88,7 @@ spec:
           - parentType
           - projectId
           - projectName
+          - serviceAccountName
           - use
           type: object
         status:
