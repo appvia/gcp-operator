@@ -29,6 +29,11 @@ type GCPProjectSpec struct {
 	// +kubebuilder:validation:Required
 	// +k8s:openapi-gen=false
 	BillingAccountName string `json:"billingAccountName"`
+	// ServiceAccountName is the name used when creating the service account
+	// e.g. `hub-admin`
+	// +kubebuilder:validation:Minimum=3
+	// +kubebuilder:validation:Required
+	ServiceAccountName string `json:"serviceAccountName"`
 	// GCPCredentials is a reference to the gcp credentials object to use
 	// +kubebuilder:validation:Required
 	// +k8s:openapi-gen=false
