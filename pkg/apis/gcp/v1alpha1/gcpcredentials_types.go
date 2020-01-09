@@ -27,7 +27,7 @@ type GCPCredentialsSpec struct {
 // +k8s:openapi-gen=true
 type GCPCredentialsStatus struct {
 	// Verified checks that the credentials are ok and valid
-	Verified bool `json:"verified"`
+	Verified bool `json:"verified,omitempty"`
 	// Status provides a overall status
 	Status string `json:"status"`
 }

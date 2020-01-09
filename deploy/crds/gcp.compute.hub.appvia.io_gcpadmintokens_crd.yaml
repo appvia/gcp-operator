@@ -31,20 +31,23 @@ spec:
         spec:
           description: GCPAdminTokenSpec defines the desired state of GCPAdminToken
           properties:
-            token:
-              description: Token is the bearer token used to setup the initial GCP admin project and service account
+            organizationId:
+              description: Organization is the GCP org you wish the projects to reside
+                within
               type: string
             projectId:
-              description: ProjectId is the GCP project ID these credentials belong to
-                has
+              description: ProjectId is the GCP project ID these credentials belong
+                to
               type: string
-            organizationId:
-              description: OrganizationId is the GCP organization these credentials belong to
+            token:
+              description: Token is the bearer token used to setup the initial GCP
+                admin project and service account You must grab a token using 'gcloud
+                auth print-access-token you@example.com'
               type: string
           required:
-          - token
-          - projectId
           - organizationId
+          - projectId
+          - token
           type: object
         status:
           description: GCPAdminTokenStatus defines the observed state of GCPAdminToken
@@ -52,8 +55,12 @@ spec:
             status:
               description: Status provides a overall status
               type: string
+            verified:
+              description: Verified checks that the token is ok and valid
+              type: boolean
           required:
           - status
+          - verified
           type: object
       type: object
   version: v1alpha1
