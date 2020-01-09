@@ -105,8 +105,15 @@ func schema_pkg_apis_gcp_v1alpha1_GCPAdminProjectSpec(ref common.ReferenceCallba
 							Format:      "",
 						},
 					},
+					"serviceAccountName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ServiceAccountName is the name used when creating the service account e.g. 'hub-admin'",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
-				Required: []string{"projectId", "projectName", "parentType", "parentId"},
+				Required: []string{"projectId", "projectName", "parentType", "parentId", "serviceAccountName"},
 			},
 		},
 	}
@@ -186,7 +193,7 @@ func schema_pkg_apis_gcp_v1alpha1_GCPAdminTokenSpec(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"token": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Token is the bearer token used to setup the initial GCP admin project and service account You must grab a token using `gcloud auth print-access-token you@example.com`",
+							Description: "Token is the bearer token used to setup the initial GCP admin project and service account You must grab a token using 'gcloud auth print-access-token you@example.com'",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -341,7 +348,7 @@ func schema_pkg_apis_gcp_v1alpha1_GCPCredentialsStatus(ref common.ReferenceCallb
 						},
 					},
 				},
-				Required: []string{"verified", "status"},
+				Required: []string{"status"},
 			},
 		},
 	}

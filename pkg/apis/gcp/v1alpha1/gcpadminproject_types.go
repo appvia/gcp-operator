@@ -26,12 +26,12 @@ type GCPAdminProjectSpec struct {
 	// +kubebuilder:validation:Required
 	ParentId string `json:"parentId"`
 	// BillingAccountName is the resource name of the billing account associated with the project
-	// e.g. `012345-567890-ABCDEF`
+	// e.g. '012345-567890-ABCDEF'
 	// +kubebuilder:validation:Required
 	// +k8s:openapi-gen=false
 	BillingAccountName string `json:"billingAccountName"`
 	// ServiceAccountName is the name used when creating the service account
-	// e.g. `hub-admin`
+	// e.g. 'hub-admin'
 	// +kubebuilder:validation:Minimum=3
 	// +kubebuilder:validation:Required
 	ServiceAccountName string `json:"serviceAccountName"`

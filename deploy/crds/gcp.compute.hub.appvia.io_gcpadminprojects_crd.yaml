@@ -33,7 +33,7 @@ spec:
           properties:
             billingAccountName:
               description: BillingAccountName is the resource name of the billing
-                account associated with the project
+                account associated with the project e.g. '012345-567890-ABCDEF'
               type: string
             parentId:
               description: ParentId is the type specific ID of the parent this project
@@ -54,11 +54,12 @@ spec:
               description: ProjectName is the GCP project name
               type: string
             serviceAccountName:
-              description: ServiceAccountName is the name given to the GCP service account
+              description: ServiceAccountName is the name used when creating the service
+                account e.g. 'hub-admin'
               type: string
             use:
-              description: GCPAdminTokens is a reference to the gcp admin tokens object
-                to use
+              description: GCPAdminToken is a reference to the gcp token object to
+                use
               properties:
                 group:
                   description: Group is the api group
