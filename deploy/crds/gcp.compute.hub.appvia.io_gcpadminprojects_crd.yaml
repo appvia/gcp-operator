@@ -31,6 +31,9 @@ spec:
         spec:
           description: GCPAdminProjectSpec defines the desired state of GCPAdminProject
           properties:
+            token:
+              description: Token is the bearer token used to authenticate
+              type: string
             billingAccountName:
               description: BillingAccountName is the resource name of the billing
                 account associated with the project e.g. '012345-567890-ABCDEF'
@@ -84,6 +87,7 @@ spec:
               - version
               type: object
           required:
+          - token
           - billingAccountName
           - parentId
           - parentType

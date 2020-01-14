@@ -8,7 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -18,7 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var logger = logf.Log.WithName("controller_gcpadminproject")
+// Setup logging
+var Logger = logf.Log.WithName("controller_gcpadminproject")
 
 // Add creates a new GCPAdminProject Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -63,7 +63,7 @@ type ReconcileGCPAdminProject struct {
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	reqLogger := logger.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	reqLogger := Logger.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling GCPAdminProject")
 
 	// Fetch the GCPAdminProject instance
@@ -78,24 +78,9 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 
 	reqLogger.Info("Found the GCPAdminProject CR")
 
-	adminToken := &gcpv1alpha1.GCPAdminToken{}
-
-	reference := types.NamespacedName{
-		Namespace: adminProjectInstance.Spec.Use.Namespace,
-		Name:      adminProjectInstance.Spec.Use.Name,
-	}
-
 	ctx := context.Background()
 
-	err := r.client.Get(ctx, reference, adminToken)
-
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	reqLogger.Info("Found the GCPAdminToken")
-
-	bearer := adminToken.Spec.Token
+	bearer := adminProjectInstance.Spec.Token
 
 	// Get project details from spec
 	projectId, projectName, parentType, parentId := adminProjectInstance.Spec.ProjectId, adminProjectInstance.Spec.ProjectName, adminProjectInstance.Spec.ParentType, adminProjectInstance.Spec.ParentId
@@ -121,7 +106,7 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 			adminProjectInstance.Status.Status = core.PendingStatus
 
 			if err := r.client.Status().Update(ctx, adminProjectInstance); err != nil {
-				logger.Error(err, "failed to update the resource status")
+				reqLogger.Error(err, "failed to update the resource status")
 				return reconcile.Result{}, err
 			}
 
@@ -147,7 +132,7 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 			adminProjectInstance.Status.Status = core.PendingStatus
 
 			if err := r.client.Status().Update(ctx, adminProjectInstance); err != nil {
-				logger.Error(err, "failed to update the resource status")
+				reqLogger.Error(err, "failed to update the resource status")
 				return reconcile.Result{}, err
 			}
 		}
@@ -158,7 +143,7 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 		adminProjectInstance.Status.Status = core.SuccessStatus
 
 		if err := r.client.Status().Update(ctx, adminProjectInstance); err != nil {
-			logger.Error(err, "failed to update the resource status")
+			reqLogger.Error(err, "failed to update the resource status")
 
 			return reconcile.Result{}, err
 		}
@@ -177,7 +162,7 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 	adminProjectInstance.Status.Status = core.PendingStatus
 
 	if err := r.client.Status().Update(ctx, adminProjectInstance); err != nil {
-		logger.Error(err, "failed to update the resource status")
+		reqLogger.Error(err, "failed to update the resource status")
 
 		return reconcile.Result{}, err
 	}
@@ -197,7 +182,7 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 	}
 
 	if err := r.client.Status().Update(ctx, adminProjectInstance); err != nil {
-		logger.Error(err, "failed to update the resource status")
+		reqLogger.Error(err, "failed to update the resource status")
 		return reconcile.Result{}, err
 	}
 
@@ -211,12 +196,13 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 
 	// Enable each API in the new project
 	for _, s := range servicesToEnable {
+		reqLogger.Info("Enabling service: " + s + " for project: " + projectId)
 		operationName, err := HttpEnableAPI(projectId, s, bearer)
-		reqLogger.Info("Waiting for operation:", operationName)
+		reqLogger.Info("Waiting for operation: " + operationName)
 		_, err = HttpWaitForSMOperation(operationName, bearer)
 
 		if err != nil {
-			logger.Error(err, "failed to enable the service:", s)
+			reqLogger.Error(err, "failed to enable the service: "+s)
 			return reconcile.Result{}, err
 		}
 		reqLogger.Info("Enabled service: " + s)
@@ -235,11 +221,11 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 	// err = HttpSetOrgIam(bearer, serviceAccount.Email, parentId)
 
 	// Create the credential as a CR
-	reqLogger.Info("Creating the GCPCredentials CR: hub-admin-credentials in namespace: " + request.Namespace)
+	reqLogger.Info("Creating the GCPCredentials CR: " + projectId + " in namespace: " + request.Namespace)
 
 	adminCredential := &gcpv1alpha1.GCPCredentials{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "hub-admin-credentials", // TODO: rename or add to spec
+			Name:      adminProjectInstance.Spec.ProjectId + "-gcpcreds",
 			Namespace: request.Namespace,
 		},
 		Spec: gcpv1alpha1.GCPCredentialsSpec{
@@ -262,7 +248,7 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 	adminProjectInstance.Status.Status = core.SuccessStatus
 
 	if err := r.client.Status().Update(ctx, adminProjectInstance); err != nil {
-		logger.Error(err, "failed to update the resource status")
+		reqLogger.Error(err, "failed to update the resource status")
 
 		return reconcile.Result{}, err
 	}

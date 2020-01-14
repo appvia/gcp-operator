@@ -9,6 +9,11 @@ import (
 // GCPAdminProjectSpec defines the desired state of GCPAdminProject
 // +k8s:openapi-gen=true
 type GCPAdminProjectSpec struct {
+	// Token is the bearer token used to setup the initial GCP admin project and service account
+	// You must grab a token using 'gcloud auth print-access-token you@example.com'
+	// +kubebuilder:validation:Minimum=3
+	// +kubebuilder:validation:Required
+	Token string `json:"token"`
 	// ProjectId is the GCP project ID
 	// +kubebuilder:validation:Minimum=3
 	// +kubebuilder:validation:Required
