@@ -40,10 +40,6 @@ type GCPAdminProjectSpec struct {
 	// +kubebuilder:validation:Minimum=3
 	// +kubebuilder:validation:Required
 	ServiceAccountName string `json:"serviceAccountName"`
-	// GCPAdminToken is a reference to the gcp token object to use
-	// +kubebuilder:validation:Required
-	// +k8s:openapi-gen=false
-	Use core.Ownership `json:"use"`
 }
 
 // GCPAdminProjectStatus defines the observed state of GCPAdminProject

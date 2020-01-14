@@ -89,6 +89,7 @@ func (r *ReconcileGCPAdminProject) Reconcile(request reconcile.Request) (reconci
 	projectExists, err := HttpProjectExists(ctx, bearer, projectId)
 
 	if err != nil {
+		reqLogger.Info("Error getting checking if project exists")
 		return reconcile.Result{}, err
 	}
 
