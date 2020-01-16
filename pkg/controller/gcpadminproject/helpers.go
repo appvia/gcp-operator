@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
+	"os"
 	"reflect"
 	"time"
 
@@ -33,10 +33,12 @@ func CallGoogleRest(bearer, url, method string, reqBody []byte) (responseBody []
 		panic(err)
 	}
 	defer resp.Body.Close()
-	fmt.Println("response Status:", resp.Status)
-	fmt.Println("response Headers:", resp.Header)
 	body, err := ioutil.ReadAll(resp.Body)
-	fmt.Println("response Body:", string(body))
+	if os.Getenv("DEBUG") == "true" {
+		fmt.Println("response Status:", resp.Status)
+		fmt.Println("response Headers:", resp.Header)
+		fmt.Println("response Body:", string(body))
+	}
 	return body, err
 }
 
@@ -89,8 +91,6 @@ func HttpUpdateProject(ctx context.Context, bearer, projectId, projectName, pare
 func HttpProjectExists(ctx context.Context, bearer, projectId string) (exists bool, err error) {
 	url := "https://cloudresourcemanager.googleapis.com/v1/projects?filter=id:" + projectId
 
-	log.Println("Listing projects matching filter id:" + projectId)
-
 	type projectListResponse struct {
 		Projects []cloudresourcemanager.Project `json:"projects"`
 	}
@@ -108,11 +108,8 @@ func HttpProjectExists(ctx context.Context, bearer, projectId string) (exists bo
 	projectsReturned := len(projects.Projects)
 
 	if projectsReturned == 0 {
-		log.Println("Project not found")
 		return false, nil
 	}
-
-	log.Println("Project found")
 
 	return true, nil
 }
@@ -123,8 +120,6 @@ func HttpGetProject(ctx context.Context, bearer, projectId string) (exists bool,
 	if err != nil {
 		return
 	}
-
-	log.Println("Attempting to retrieve project", projectId)
 
 	resp, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0))
 
@@ -168,7 +163,6 @@ func HttpGetServiceAccount(bearer, projectId, serviceAccountName string) (servic
 
 func HttpCreateServiceAccountKey(bearer, projectId, serviceAccountName string) (key string, err error) {
 	url := "https://iam.googleapis.com/v1/projects/" + projectId + "/serviceAccounts/" + serviceAccountName + "@" + projectId + ".iam.gserviceaccount.com/keys"
-	fmt.Println("Creating service account key for", serviceAccountName, "in project", projectId)
 	resBody, err := CallGoogleRest(bearer, url, "POST", make([]byte, 0)) // TODO: do this better
 	var serviceAccountKey iam.ServiceAccountKey
 	err = json.Unmarshal(resBody, &serviceAccountKey)
@@ -270,18 +264,14 @@ func HttpSetOrgIam(bearer, serviceAccountEmail, orgId string) (err error) {
 
 func HttpWaitForSMOperation(operationName, bearer string) (complete bool, err error) {
 	url := "https://servicemanagement.googleapis.com/v1/" + operationName
-	log.Println("Calling URL:" + url)
 	for {
-		log.Println("Checking the status of operation", operationName)
 		resBody, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0)) // TODO: do this better
 		if err != nil {
-			log.Println("Exiting due to remote err")
 			return false, err
 		}
 		var operation servicemanagement.Operation
 		json.Unmarshal(resBody, &operation)
 		if err != nil {
-			log.Println("Exiting due to unmarshal error")
 			return false, err
 		}
 		if operation.Done {
@@ -295,18 +285,14 @@ func HttpWaitForSMOperation(operationName, bearer string) (complete bool, err er
 
 func HttpWaitForCRMOperation(operationName, bearer string) (complete bool, err error) {
 	url := "https://cloudresourcemanager.googleapis.com/v1/" + operationName
-	log.Println("Calling URL:" + url)
 	for {
-		log.Println("Checking the status of operation", operationName)
 		resBody, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0)) // TODO: do this better
 		if err != nil {
-			log.Println("Exiting due to remote err")
 			return false, err
 		}
 		var operation cloudresourcemanager.Operation
 		json.Unmarshal(resBody, &operation)
 		if err != nil {
-			log.Println("Exiting due to unmarshal error")
 			return false, err
 		}
 		if operation.Done {
@@ -323,14 +309,11 @@ func HttpGetBilling(projectId, bearer string) (billingAccountName string, err er
 
 	var billingInfo cloudbilling.ProjectBillingInfo
 
-	log.Println("Retrieving billing account for", projectId)
-
 	resp, err := CallGoogleRest(bearer, url, "GET", make([]byte, 0))
 
 	err = json.Unmarshal(resp, &billingInfo)
 
 	if err != nil {
-		log.Println("Unmarshal error")
 		return billingAccountName, err
 	}
 
@@ -345,7 +328,6 @@ func HttpUpdateBilling(projectId, billingAccountName, bearer string) (err error)
 		BillingEnabled:     true,
 	}
 	reqBody, err := json.Marshal(billingInfo)
-	log.Println("Updating billing account for", projectId, "to", billingAccountName)
 	_, err = CallGoogleRest(bearer, url, "PUT", reqBody)
 	return err
 }
@@ -366,8 +348,6 @@ func HttpEnableAPI(projectId, serviceName, bearer string) (operationName string,
 	if err != nil {
 		return operationName, err
 	}
-
-	log.Println("Enabling service", serviceName, "for project", projectId)
 
 	resp, err := CallGoogleRest(bearer, url, "POST", reqBody)
 

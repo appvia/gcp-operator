@@ -1,7 +1,6 @@
 package gcpproject
 
 import (
-	"log"
 	"time"
 
 	"github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
@@ -68,8 +67,6 @@ func ProjectExists(ctx context.Context, crm *cloudresourcemanager.Service, proje
 		return exists, err
 	}
 
-	log.Println("Listing projects matching filter id:" + projectId)
-
 	resp, err := crm.Projects.List().Filter("id:" + projectId).Do()
 
 	if err != nil {
@@ -79,11 +76,8 @@ func ProjectExists(ctx context.Context, crm *cloudresourcemanager.Service, proje
 	projectsReturned := len(resp.Projects)
 
 	if projectsReturned == 0 {
-		log.Println("Project not found")
 		return false, nil
 	}
-
-	log.Println("Project found")
 
 	return true, nil
 }
@@ -119,8 +113,6 @@ func CreateProject(ctx context.Context, crm *cloudresourcemanager.Service, proje
 		Parent:    parent,
 	}
 
-	log.Println("Creating project")
-
 	resp, err := crm.Projects.Create(rb).Context(ctx).Do()
 
 	if err != nil {
@@ -153,8 +145,6 @@ func UpdateProject(ctx context.Context, crm *cloudresourcemanager.Service, proje
 
 func WaitForOperationCRM(ctx context.Context, crm *cloudresourcemanager.Service, operationName string) (complete bool, err error) {
 
-	log.Println("Waiting for operation", operationName)
-
 	for {
 		resp, err := crm.Operations.Get(operationName).Context(ctx).Do()
 		if err != nil {
@@ -166,13 +156,10 @@ func WaitForOperationCRM(ctx context.Context, crm *cloudresourcemanager.Service,
 		}
 		time.Sleep(1000 * time.Millisecond)
 	}
-	log.Println("Operation complete")
 	return
 }
 
 func WaitForOperationSM(ctx context.Context, sm *servicemanagement.APIService, operationName string) (complete bool, err error) {
-
-	log.Println("Waiting for operation", operationName)
 
 	for {
 		resp, err := sm.Operations.Get(operationName).Context(ctx).Do()
@@ -184,7 +171,6 @@ func WaitForOperationSM(ctx context.Context, sm *servicemanagement.APIService, o
 		}
 		time.Sleep(1000 * time.Millisecond)
 	}
-	log.Println("Operation complete")
 	return
 }
 
@@ -212,8 +198,6 @@ func UpdateProjectBilling(ctx context.Context, cb *cloudbilling.APIService, bill
 }
 
 func EnableAPI(ctx context.Context, sm *servicemanagement.APIService, projectId, serviceName string) (operationName string, err error) {
-	log.Println("Enabling service", serviceName, "for project", projectId)
-
 	resp, err := sm.Services.Enable(serviceName, &servicemanagement.EnableServiceRequest{
 		ConsumerId: "project:" + projectId,
 	}).Context(ctx).Do()
@@ -235,7 +219,6 @@ func CreateServiceAccount(ctx context.Context, i *iam.Service, projectId, name, 
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Created service account: %v", account)
 	return account, nil
 }
 
@@ -246,6 +229,5 @@ func CreateServiceAccountKey(ctx context.Context, i *iam.Service, projectId, ser
 	if err != nil {
 		return key, err
 	}
-	log.Printf("Created key: %v", serviceAccountName)
 	return serviceAccount.PrivateKeyData, nil
 }
