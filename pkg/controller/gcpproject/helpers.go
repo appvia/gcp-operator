@@ -231,3 +231,32 @@ func CreateServiceAccountKey(ctx context.Context, i *iam.Service, projectId, ser
 	}
 	return serviceAccount.PrivateKeyData, nil
 }
+
+func MakeProjectAdmin(ctx context.Context, crm *cloudresourcemanager.Service, projectId, serviceAccountName, serviceAccountEmail string) (err error) {
+	resource := "projects/" + projectId + "/serviceAccounts/" + serviceAccountName
+	members := []string{
+		"serviceAccount:" + serviceAccountEmail,
+	}
+
+	binding := &cloudresourcemanager.Binding{
+		Members: members,
+		Role:    "roles/owner",
+	}
+
+	bindings := []*cloudresourcemanager.Binding{
+		binding,
+	}
+
+	rb := &cloudresourcemanager.SetIamPolicyRequest{
+		Policy: &cloudresourcemanager.Policy{
+			Bindings: bindings,
+		},
+	}
+
+	_, err = crm.Projects.SetIamPolicy(resource, rb).Context(ctx).Do()
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
