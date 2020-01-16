@@ -6,8 +6,8 @@ import (
 
 	gcpv1alpha1 "github.com/appvia/gcp-operator/pkg/apis/gcp/v1alpha1"
 	core "github.com/appvia/hub-apis/pkg/apis/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -262,7 +262,7 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Create service account and then create a key
 	reqLogger.Info("Creating service account: " + projectInstance.Spec.ServiceAccountName)
-	_, err = CreateServiceAccount(ctx, iam, projectId, projectInstance.Spec.ServiceAccountName, "Created by the Appvia Hub")
+	serviceAccount, err := CreateServiceAccount(ctx, iam, projectId, projectInstance.Spec.ServiceAccountName, "Created by the Appvia Hub")
 
 	if err != nil {
 		return reconcile.Result{}, err
@@ -275,7 +275,11 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	// TODO: set project and potentially org permissions for service account
+	err = MakeProjectAdmin(ctx, crm, projectId, serviceAccount.Name, serviceAccount.Email)
+
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
 	// Create the credential as a CR
 	reqLogger.Info("Creating the GCPCredentials CR:" + projectId + "-gcpcreds in namespace: " + request.Namespace)
