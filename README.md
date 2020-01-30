@@ -1,52 +1,33 @@
 # Operator to manage GCP projects
 
-## Setup tasks
+## Overview
+This operator can be used to setup GCP projects linked to an existing organisation and billing account. It will provision a service account within each project, generate credentials and saved them to a custom resource within the cluster.
 
-### Get the details of your GCP organization and billing account (or create them if they dont exist yet...)
+This operator contains the following CRDs:
+* `GCPCredentials` - this defines a GCP service account credential which can be used to authenticate in the GCP SDK/CLI
+* `GCPAdminProject` - this defines a GCP admin project, used to create an admin service account which has organisation level permissions, required for creating new projects
+* `GCPProject` - this defines a GCP project, intended for use by a team
+
+## Using the operator
+
+### Get the details of your GCP organization and billing account (or [create them](https://cloud.google.com/resource-manager/docs/creating-managing-organization) if they dont exist yet...)
 ```
-$ gcloud organizations list
-$ gcloud beta billing accounts list
+$ gcloud organizations list # Note the `ID`
+$ gcloud beta billing accounts list # Note the `ACCOUNT_ID`
 ```
-### Set some env vars
+### Create an `GCPAdminProject` custom resource, using the details above
 ```
-$ export ORG_ID=YOUR_ORG_ID # Get from above
-$ export BILLING_ACCOUNT_ID=YOUR_BILLING_ACCOUNT_ID # Get from above
-$ export ADMIN_PROJECT_NAME=YOUR_ADMIN_PROJECT_NAME # Set to something sensible
-$ export ADMIN_SERVICE_ACCOUNT_NAME=YOUR_ADMIN_SERVICE_ACCOUNT_NAME # Set to something sensible
-$ export CREDS_PATH=~/.config/gcloud/konduktor-admin.json
+$ kubectl create -f ...
 ```
-### Create an admin project and link to billing
+### Create a `GCPProject` custom resource
 ```
-$ gcloud projects create ${ADMIN_PROJECT_NAME} \
-  --organization ${ORG_ID} \
-  --set-as-default
-$ gcloud beta billing projects link ${ADMIN_PROJECT_NAME} \
-  --billing-account ${BILLING_ACCOUNT_ID}
+$ kubectl create -f ...
 ```
-### Create an admin service account
+### Get the project service account credentials to setup gcloud CLI
 ```
-$ gcloud iam service-accounts create konduktor \
-  --display-name "Konduktor admin account"
-$ gcloud iam service-accounts keys create ${CREDS_PATH} \
-  --iam-account konduktor@${ADMIN_PROJECT_NAME}.iam.gserviceaccount.com
-$ gcloud projects add-iam-policy-binding ${ADMIN_PROJECT_NAME} \
-  --member serviceAccount:konduktor@${ADMIN_PROJECT_NAME}.iam.gserviceaccount.com \
-  --role roles/viewer
+$ kubectl get ... -o yaml
 ```
-### Enable some APIs
+### [Activate service account](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account) and use the project
 ```
-# gcloud services enable cloudresourcemanager.googleapis.com
-# gcloud services enable cloudbilling.googleapis.com
-# gcloud services enable iam.googleapis.com
-# gcloud services enable compute.googleapis.com
-# gcloud services enable serviceusage.googleapis.com
-```
-### Add org level permissions to allow service account to create projects
-```
-$ gcloud organizations add-iam-policy-binding ${ORG_ID} \
-  --member serviceAccount:konduktor@${ADMIN_PROJECT_NAME}.iam.gserviceaccount.com \
-  --role roles/resourcemanager.projectCreator
-$ gcloud organizations add-iam-policy-binding ${ORG_ID} \
-  --member serviceAccount:konduktor@${ADMIN_PROJECT_NAME}.iam.gserviceaccount.com \
-  --role roles/billing.user
+$ gcloud auth activate-service-account [ACCOUNT] --key-file=./service-account.json
 ```
