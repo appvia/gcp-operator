@@ -134,11 +134,23 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 	if projectExists {
 		project, err := GetProject(ctx, crm, projectId)
 
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+
 		billingAccount, err := GetProjectBilling(ctx, cb, projectId)
+
+		if err != nil {
+			return reconcile.Result{}, err
+		}
 
 		if projectName != project.Name || parentType != project.Parent.Type || parentId != project.Parent.Id {
 			// Exists but state differs
 			updateOperationName, err := UpdateProject(ctx, crm, projectId, projectName, parentId, parentType)
+
+			if err != nil {
+				return reconcile.Result{}, err
+			}
 
 			// Set status to pending
 			projectInstance.Status.Status = core.PendingStatus
@@ -259,6 +271,10 @@ func (r *ReconcileGCPProject) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	iam, err := GoogleIAMClient(ctx, keyString)
+
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
 	// Create service account and then create a key
 	reqLogger.Info("Creating service account: " + projectInstance.Spec.ServiceAccountName)
