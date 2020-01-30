@@ -15,11 +15,15 @@ This operator contains the following CRDs:
 $ gcloud organizations list # Note the `ID`
 $ gcloud beta billing accounts list # Note the `ACCOUNT_ID`
 ```
+### Get a bearer token from your account
+```
+$ gcloud auth application-default print-access-token
+```
 ### Create an `GCPAdminProject` custom resource, using the details above
 ```
 $ kubectl create -f ...
 ```
-### Create a `GCPProject` custom resource
+### Create a `GCPProject` custom resource, passing a reference to the `GCPCredentials` object
 ```
 $ kubectl create -f ...
 ```
